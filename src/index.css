@@ -1,1 +1,239 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: "Archivo Black", "Arial Black", sans-serif;
+  --font-body: "Instrument Sans", "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+
+  --color-bg: #0f131a;
+  --color-pit: #0b0e14;
+  --color-panel: #151a23;
+  --color-raise: #1b212d;
+  --color-line: #27303f;
+  --color-linesoft: #1f2632;
+  --color-ink: #e9e4d6;
+  --color-dim: #93a0b4;
+  --color-faint: #5c6778;
+  --color-amber: #f0a63f;
+  --color-amberhot: #ffc069;
+  --color-mint: #45d498;
+  --color-cyanx: #58c7d8;
+  --color-rosex: #e56a54;
+  --color-slatex: #8b95a9;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  background-image:
+    radial-gradient(1100px 520px at 88% -12%, rgba(240, 166, 63, 0.075), transparent 62%),
+    radial-gradient(950px 620px at -12% 108%, rgba(88, 199, 216, 0.06), transparent 60%),
+    linear-gradient(rgba(233, 228, 214, 0.026) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(233, 228, 214, 0.026) 1px, transparent 1px);
+  background-size: auto, auto, 46px 46px, 46px 46px;
+  background-attachment: fixed;
+}
+
+/* film-grain overlay */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+}
+
+::selection {
+  background: rgba(240, 166, 63, 0.32);
+  color: #fff8ea;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2c3648 transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #2c3648; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---------- crafted pieces ---------- */
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+.panel {
+  position: relative;
+  background: linear-gradient(180deg, rgba(27, 33, 45, 0.72), rgba(21, 26, 35, 0.92));
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
+}
+
+/* L-shaped corner ticks */
+.ticks::before,
+.ticks::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-color: var(--color-amber);
+  border-style: solid;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.ticks::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+  border-top-left-radius: 10px;
+}
+.ticks::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+  border-bottom-right-radius: 10px;
+}
+
+.input {
+  width: 100%;
+  background: var(--color-pit);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+.input::placeholder { color: #55617a; }
+.input:focus {
+  border-color: rgba(240, 166, 63, 0.65);
+  box-shadow: 0 0 0 3px rgba(240, 166, 63, 0.12);
+}
+
+.btn-analyze {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffc069, #f0a63f 55%, #d98a24);
+  color: #221503;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  border-radius: 9px;
+  transition: transform 140ms ease, box-shadow 200ms ease, filter 160ms ease;
+  box-shadow: 0 6px 24px -8px rgba(240, 166, 63, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-analyze:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 10px 30px -8px rgba(240, 166, 63, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.btn-analyze:active:not(:disabled) { transform: translateY(0px) scale(0.995); }
+.btn-analyze:disabled { filter: grayscale(0.65) brightness(0.6); cursor: not-allowed; box-shadow: none; }
+.btn-analyze::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -40%;
+  width: 34%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-18deg);
+  animation: sheen 3.2s ease-in-out infinite;
+}
+@keyframes sheen {
+  0%, 55% { left: -40%; }
+  85%, 100% { left: 130%; }
+}
+
+/* ---------- motion ---------- */
+
+@keyframes eqbar {
+  0%, 100% { transform: scaleY(0.22); }
+  50% { transform: scaleY(1); }
+}
+.eq-bar {
+  transform-origin: bottom;
+  animation: eqbar 0.9s ease-in-out infinite;
+}
+
+@keyframes drift {
+  to { transform: translateX(-50%); }
+}
+.scope-drift { animation: drift 14s linear infinite; }
+
+@keyframes pulsedot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px 1px currentColor; }
+  50% { opacity: 0.35; box-shadow: 0 0 2px 0 currentColor; }
+}
+.pulse-dot { animation: pulsedot 1.8s ease-in-out infinite; }
+
+@keyframes blinkc {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+.cursor-blink { animation: blinkc 1.1s steps(1) infinite; }
+
+@keyframes dashflow {
+  to { stroke-dashoffset: -640; }
+}
+.blip-line {
+  stroke-dasharray: 300 340;
+  animation: dashflow 5.2s linear infinite;
+}
+
+@keyframes scanmove {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(420%); }
+}
+.scan-bar { animation: scanmove 1.6s cubic-bezier(0.45, 0.1, 0.4, 0.9) infinite; }
+
+.reveal {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 620ms cubic-bezier(0.22, 0.8, 0.3, 1), transform 620ms cubic-bezier(0.22, 0.8, 0.3, 1);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+.seg-btn {
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.row-hover {
+  transition: background 140ms ease, transform 140ms ease, border-color 140ms ease;
+}
+.row-hover:hover {
+  background: rgba(240, 166, 63, 0.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .eq-bar, .scope-drift, .pulse-dot, .cursor-blink, .blip-line, .scan-bar, .btn-analyze::after {
+    animation: none !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .row-hover, .seg-btn, .btn-analyze, .input {
+    transition: none !important;
+  }
+}
