@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { LyricsBlock, ReportData } from "./lib/types";
+import type { LyricsBlock, PingState, ReportData } from "./lib/types";
 import { analyzeAudioFile, AnalysisError, type AudioAnalysisResult } from "./lib/audioEngine";
 import { analyzeLyrics } from "./lib/lyricsEngine";
 import { postToBackend } from "./lib/backend";
@@ -54,6 +54,34 @@ export default function App() {
   // playback element for the uploaded file
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const reportWrapRef = useRef<HTMLDivElement>(null);
+
+  // live backend reachability check (answers "why is it not working?" up front)
+  const [ping, setPing] = useState<PingState>("idle");
+  useEffect(() => {
+    if (engine !== "backend") {
+      setPing("idle");
+      return;
+    }
+    let cancelled = false;
+    const ctrl = new AbortController();
+    setPing("checking");
+    const timer = setTimeout(() => ctrl.abort(), 3500);
+    fetch(`${endpoint.replace(/\/+$/, "")}/api/health`, { signal: ctrl.signal })
+      .then((r) => {
+        if (!cancelled) setPing(r.ok ? "ok" : "fail");
+      })
+      .catch(() => {
+        if (!cancelled) setPing("fail");
+      })
+      .finally(() => clearTimeout(timer));
+    return () => {
+      cancelled = true;
+      ctrl.abort();
+      clearTimeout(timer);
+    };
+  }, [engine, endpoint]);
+
+  const canRun = !!file || lyrics.trim().length > 0;
 
   useEffect(() => {
     try {
@@ -263,6 +291,8 @@ export default function App() {
                 setEngine={setEngine}
                 endpoint={endpoint}
                 setEndpoint={setEndpoint}
+                ping={ping}
+                canRun={canRun}
                 running={status === "running"}
                 onAnalyze={runAnalysis}
               />

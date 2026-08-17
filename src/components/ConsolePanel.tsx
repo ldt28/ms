@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { formatBytes } from "../lib/types";
+import { formatBytes, type PingState } from "../lib/types";
 
 export const SAMPLE_LYRICS = `Neon rain on the boulevard screen,
 I been chasing down a drum machine,
@@ -33,12 +33,14 @@ export function ConsolePanel(props: {
   setEngine: (v: EngineMode) => void;
   endpoint: string;
   setEndpoint: (v: string) => void;
+  ping: PingState;
+  canRun: boolean;
   running: boolean;
   onAnalyze: () => void;
 }) {
   const {
     title, setTitle, artist, setArtist, file, setFile, lyrics, setLyrics,
-    transcribe, setTranscribe, engine, setEngine, endpoint, setEndpoint, running, onAnalyze,
+    transcribe, setTranscribe, engine, setEngine, endpoint, setEndpoint, ping, canRun, running, onAnalyze,
   } = props;
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -194,21 +196,50 @@ export function ConsolePanel(props: {
             Real DSP in this tab: decode → onset envelope → tempo autocorrelation → chroma key → sections. Nothing leaves your machine.
           </p>
         ) : (
-          <input
-            className="input mt-2"
-            value={endpoint}
-            onChange={(e) => setEndpoint(e.target.value)}
-            placeholder="http://localhost:8000"
-            spellCheck={false}
-          />
+          <>
+            <input
+              className="input mt-2"
+              value={endpoint}
+              onChange={(e) => setEndpoint(e.target.value)}
+              placeholder="http://localhost:8000"
+              spellCheck={false}
+            />
+            <div
+              className={`mt-2 flex items-start gap-2 rounded-md border px-3 py-2 font-mono text-[10px] leading-relaxed ${
+                ping === "ok"
+                  ? "border-mint/40 bg-mint/8 text-mint"
+                  : ping === "fail"
+                    ? "border-rosex/40 bg-rosex/8 text-rosex"
+                    : "border-line bg-pit text-dim"
+              }`}
+            >
+              <span
+                className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
+                  ping === "ok" ? "bg-mint text-mint pulse-dot" : ping === "fail" ? "bg-rosex text-rosex" : "bg-amber text-amber pulse-dot"
+                }`}
+              />
+              <span>
+                {ping === "checking" && "Checking connection to /api/health…"}
+                {ping === "ok" && "Backend reachable — reports will come from your Python server."}
+                {ping === "fail" && (
+                  <>
+                    Not reachable at this address. Start uvicorn (BUILD PLAN → phase 04), check the port, or allow CORS.
+                    Analysis will fall back to the browser engine.
+                  </>
+                )}
+              </span>
+            </div>
+          </>
         )}
       </div>
 
-      <button onClick={onAnalyze} disabled={running} className="btn-analyze w-full px-4 py-3.5 text-sm">
+      <button onClick={onAnalyze} disabled={running || !canRun} className="btn-analyze w-full px-4 py-3.5 text-sm">
         {running ? "ANALYZING…" : "RUN ANALYSIS"}
       </button>
       <p className="-mt-2 text-center font-mono text-[9.5px] text-faint">
-        audio + lyrics → full report · audio only → audio facts · lyrics only → text metrics
+        {!canRun
+          ? "⚠ add an audio file or paste lyrics first — then run analysis"
+          : "audio + lyrics → full report · audio only → audio facts · lyrics only → text metrics"}
       </p>
     </div>
   );

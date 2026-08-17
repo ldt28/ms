@@ -5,6 +5,9 @@
 
 export type Tier = "measured" | "computed" | "estimated" | "guessed";
 
+/** Live reachability of the Python backend (/api/health ping). */
+export type PingState = "idle" | "checking" | "ok" | "fail";
+
 export interface Finding<T> {
   value: T | null;
   tier: Tier;
