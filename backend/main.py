@@ -29,6 +29,7 @@ from audio_analysis import AudioAnalysisError, analyze_audio
 from lyrics_analysis import LyricsError, analyze_lyrics
 from report import build_report
 from transcription import TranscriptionError, transcribe_audio
+from youtube_fetch import YouTubeFetchError, fetch_youtube_audio, is_youtube_url
 
 app = FastAPI(title="Signal — Song Breakdown API", version="0.2.0")
 
@@ -79,24 +80,38 @@ async def analyze(
         elif audio_url.strip():
             source_name = audio_url.strip()
             path = tmp / REMOTE_NAME
-            try:
-                req = urllib.request.Request(source_name, headers={"User-Agent": "Signal/0.2"})
-                with urllib.request.urlopen(req, timeout=90) as resp, open(path, "wb") as out:
-                    copied = 0
-                    while True:
-                        chunk = resp.read(1 << 16)
-                        if not chunk:
-                            break
-                        copied += len(chunk)
-                        if copied > MAX_BYTES:
-                            raise ValueError("remote file is over 80 MB")
-                        out.write(chunk)
-            except Exception as exc:  # noqa: BLE001 — explicit download failure
-                audio_error = (
-                    f"Could not download the audio URL: {exc}. "
-                    "Direct file links work; YouTube/Spotify pages do not (no stream ripping by design)."
-                )
-                path = None
+
+            # YouTube links go through the OPTIONAL yt-dlp converter
+            # (pip install yt-dlp) — for content you own or are licensed to use.
+            if is_youtube_url(source_name):
+                try:
+                    path = fetch_youtube_audio(source_name, tmp)
+                    warnings.append(
+                        "Audio was converted from a YouTube URL via yt-dlp on your own backend. "
+                        "Only do this for content you own or are licensed to use."
+                    )
+                except YouTubeFetchError as exc:
+                    audio_error = str(exc)
+                    path = None
+            else:
+                try:
+                    req = urllib.request.Request(source_name, headers={"User-Agent": "Signal/0.2"})
+                    with urllib.request.urlopen(req, timeout=90) as resp, open(path, "wb") as out:
+                        copied = 0
+                        while True:
+                            chunk = resp.read(1 << 16)
+                            if not chunk:
+                                break
+                            copied += len(chunk)
+                            if copied > MAX_BYTES:
+                                raise ValueError("remote file is over 80 MB")
+                            out.write(chunk)
+                except Exception as exc:  # noqa: BLE001 — explicit download failure
+                    audio_error = (
+                        f"Could not download the audio URL: {exc}. "
+                        "Direct file links work; for YouTube links, pip install yt-dlp in the backend venv."
+                    )
+                    path = None
 
         # ---- 2) audio analysis (explicit error fields on failure) ----
         if path is not None and audio_error is None:

@@ -391,9 +391,10 @@ export function ConsolePanel(props: {
           <span className="font-mono text-[9.5px] text-faint">{lyrics.length} chars</span>
         </div>
         {transcribe && engine === "browser" && (
-          <p className="mt-2 rounded-md border border-amber/35 bg-amber/8 px-3 py-2 font-mono text-[10px] leading-relaxed text-amber">
-            Vocal transcription needs the Python backend with faster-whisper. In browser mode this returns an explicit
-            transcription_error — that is the honest path.
+          <p className="mt-2 rounded-md border border-mint/35 bg-mint/8 px-3 py-2 font-mono text-[10px] leading-relaxed text-mint">
+            Whisper-tiny runs right in this tab — nothing is uploaded. First use downloads a ~45 MB model (cached
+            after that); a 3-minute song transcribes in roughly 1–3 minutes. Works on uploads and direct audio links.
+            Expect misheard words — the transcript lands in the box above so you can fix it before re-running.
           </p>
         )}
       </div>

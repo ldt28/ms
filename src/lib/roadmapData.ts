@@ -99,7 +99,7 @@ export const PHASES: Phase[] = [
       { id: "p6-1", text: "Test 1 — no audio, no lyrics → expect an explicit “unavailable” report, not a crash" },
       { id: "p6-2", text: "Test 2 — audio only → expect BPM, key, structure, energy, texture" },
       { id: "p6-3", text: "Test 3 — audio + pasted lyrics → also expect rhyme, flow and hook metrics" },
-      { id: "p6-4", text: "Test 4 — tick “transcribe vocals” → works if faster-whisper is installed, otherwise a clear transcription_error (first run downloads a model — wait, then retry)" },
+      { id: "p6-4", text: "Test 4 — tick “transcribe vocals” → browser engine runs Whisper-tiny in-tab (first run downloads the ~45 MB model); backend engine uses faster-whisper if installed" },
       { id: "p6-5", text: "Use a small WAV / MP3 / FLAC file under 50 MB for the first pass" },
     ],
   },

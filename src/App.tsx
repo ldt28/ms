@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LyricsBlock, PingState, ReportData, ReportSource } from "./lib/types";
 import { analyzeAudioFile, AnalysisError, type AudioAnalysisResult } from "./lib/audioEngine";
 import { analyzeLyrics } from "./lib/lyricsEngine";
+import { ensureLyricLines, transcribeAudioBuffer, TranscribeError } from "./lib/transcribe";
 import { postToBackend } from "./lib/backend";
 import { resolveLink, type LinkInfo } from "./lib/linkResolver";
 import { ConsolePanel, type EngineMode, type LinkStatus } from "./components/ConsolePanel";
@@ -212,7 +213,7 @@ export default function App() {
       if (linkInfo.embedUrl) {
         // By design, not a failure: official-embed sources can't be decoded in-browser.
         audioNote =
-          "This is expected, not an error: the video plays via its official player, and Signal refuses to extract or download streams (they're encrypted, so no tool can decode them from a URL). Two ways to still get the full breakdown: drop this track's audio file into the console — the report stays bound to the video and unlocks tempo / key / sections — or paste the video's transcript (YouTube: ⋯ under the video → Show transcript) for rhyme, flow and hook metrics.";
+          "This is expected, not an error: the video plays via its official player, and no browser can decode YouTube's encrypted stream from a URL. To get the full breakdown with automatic lyrics: drop this track's audio file into the console (the report stays bound to the video, unlocks tempo / key / sections — and with the transcribe box ticked, Whisper hears the lyrics, adds them, and breaks them down automatically). Instant alternative: paste the video's own transcript (YouTube: ⋯ under the video → Show transcript).";
       } else {
         audioError = linkInfo.note ?? "Audio analysis is unavailable for this link source.";
       }
@@ -233,8 +234,27 @@ export default function App() {
         lyricsError = err instanceof Error ? err.message : "Lyrics analysis failed.";
       }
     } else if (transcribe) {
-      transcriptionError =
-        "In-browser vocal transcription is unavailable. Paste lyrics instead — or run the Python backend with faster-whisper installed (pip install faster-whisper) and switch to BACKEND mode.";
+      if (audio?.buffer) {
+        try {
+          setStage("Loading transcription model");
+          const raw = await transcribeAudioBuffer(audio.buffer, (p) => {
+            setStage(
+              p.phase === "model"
+                ? `Downloading transcription model (${p.pct}%) — cached after first use`
+                : `Hearing the vocals… transcribing (${p.pct}%)`
+            );
+          });
+          const lined = ensureLyricLines(raw);
+          setLyrics(lined); // the "add the lyrics" step — visible & editable in the console
+          lyricsBlock = analyzeLyrics(lined, { durationSec: audio.durationSec, source: "transcript" });
+        } catch (err) {
+          transcriptionError =
+            err instanceof TranscribeError ? err.message : `Transcription failed unexpectedly: ${err instanceof Error ? err.message : "unknown"}.`;
+        }
+      } else {
+        transcriptionError =
+          "Nothing decodable to listen to — add an audio file or a direct audio URL first. YouTube video links can't be decoded in a browser (encrypted streams); drop the track's audio file in and this checkbox lights up.";
+      }
     } else {
       lyricsError = "No lyrics supplied and transcription not requested — lyric metrics unavailable.";
     }
@@ -505,7 +525,7 @@ export default function App() {
                     <ol className="mt-8 flex max-w-xl flex-col gap-3">
                       {[
                         ["01", "Add a file or paste a link", "WAV / MP3 / FLAC uploads, direct audio URLs, or YouTube / Spotify / SoundCloud links."],
-                        ["02", "Paste lyrics (or don’t)", "Text powers rhyme, flow and hook metrics. Fragments only, never full lyrics."],
+                        ["02", "Lyrics — paste them or let Whisper hear them", "Tick transcribe and Whisper adds the lyrics automatically; then rhyme, flow and hook metrics follow. Fragments only, never full lyrics."],
                         ["03", "Run analysis", "Browser DSP works instantly; switch to the Python backend for transcription."],
                       ].map(([n, t, d]) => (
                         <li key={n} className="group flex gap-4 rounded-lg border border-linesoft bg-pit/60 px-4 py-3 transition-colors hover:border-amber/40">

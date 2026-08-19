@@ -531,6 +531,12 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                     ))}
                   </ul>
                 )}
+                {report.lyrics.source === "transcript" && (
+                  <p className="mt-3 rounded-md border border-cyanx/30 bg-cyanx/8 px-3 py-2 font-mono text-[10px] leading-relaxed text-cyanx">
+                    Auto-transcribed by Whisper-tiny in your browser. Singing is hard for speech models — expect
+                    misheard words. The transcript is in the lyrics box: clean it up and re-run for sharper metrics.
+                  </p>
+                )}
                 <p className="mt-3 font-mono text-[9.5px] leading-relaxed text-faint">
                   Full lyrics are never redisplayed by Signal — only short repeated fragments, per the product rule.
                 </p>

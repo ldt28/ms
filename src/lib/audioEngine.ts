@@ -21,6 +21,8 @@ export interface AudioAnalysisResult {
   durationSec: number;
   sampleRate: number;
   channels: number;
+  /** decoded PCM — reused by the in-browser vocal transcriber */
+  buffer: AudioBuffer;
   tempo: Finding<number>;
   keySig: Finding<string>;
   energy: { curve: number[]; avg: number; peak: number; dynamicRangeDb: number };
@@ -426,6 +428,7 @@ export async function analyzeAudioFile(file: File, onStage: StageFn): Promise<Au
     durationSec,
     sampleRate: sr,
     channels,
+    buffer: audio,
     tempo: {
       value: tempoValue,
       tier: "measured",
