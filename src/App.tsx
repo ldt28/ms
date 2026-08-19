@@ -88,10 +88,14 @@ export default function App() {
     };
   }, [engine, endpoint]);
 
-  // ---------- source exclusivity: file XOR link ----------
+  // ---------- source rules ----------
+  // A DIRECT link and a file are two audio sources → exclusive.
+  // An EMBED link (YouTube / Spotify / SoundCloud) provides identity + official
+  // playback, and COMPOSES with an uploaded audio file: the file unlocks the
+  // full audio metrics while the report stays bound to the video/track page.
   const setFileExclusive = (f: File | null) => {
     setFile(f);
-    if (f) {
+    if (f && linkInfo?.kind === "direct") {
       setLinkInfo(null);
       setLinkError(null);
       setLinkStatus("idle");
@@ -102,7 +106,8 @@ export default function App() {
     setLinkInfo(info);
     setLinkStatus("idle");
     setLinkError(null);
-    setFile(null);
+    // Only a DIRECT audio link competes with an uploaded file for the audio slot.
+    if (info.kind === "direct") setFile(null);
   };
 
   const handleLoadLink = async () => {
@@ -207,7 +212,7 @@ export default function App() {
       if (linkInfo.embedUrl) {
         // By design, not a failure: official-embed sources can't be decoded in-browser.
         audioNote =
-          "This is expected, not an error: it plays via the official embed, and Signal refuses to extract or download streams. Tempo / key / structure metrics don't apply to this source by design — paste lyrics above to still get rhyme, flow and hook metrics.";
+          "This is expected, not an error: the video plays via its official player, and Signal refuses to extract or download streams (they're encrypted, so no tool can decode them from a URL). Two ways to still get the full breakdown: drop this track's audio file into the console — the report stays bound to the video and unlocks tempo / key / sections — or paste the video's transcript (YouTube: ⋯ under the video → Show transcript) for rhyme, flow and hook metrics.";
       } else {
         audioError = linkInfo.note ?? "Audio analysis is unavailable for this link source.";
       }

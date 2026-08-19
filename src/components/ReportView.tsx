@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatTime, TIER_META, tierColor, type Finding, type ReportData, type Tier } from "../lib/types";
+import { extractVideoId, useYouTubePlayer, type YouTubeBridge } from "../lib/ytPlayer";
 import { TierBadge, TierLegend, useCountUp, Reveal } from "./ui";
 import { Timeline, labelColor } from "./Timeline";
 
@@ -107,8 +108,10 @@ const SOURCE_KIND: Record<string, { label: string; cls: string }> = {
   unsupported: { label: "UNSUPPORTED", cls: "border-rosex/50 bg-rosex/10 text-rosex" },
 };
 
-function PlaybackPanel({ report }: { report: ReportData }) {
+function PlaybackPanel({ report, ytBridge }: { report: ReportData; ytBridge: YouTubeBridge }) {
   const src = report.meta.source;
+  const videoId = src.kind === "youtube" && src.url ? extractVideoId(src.url) : null;
+  const ytDivRef = useYouTubePlayer(videoId, ytBridge);
   if (src.kind === "file") return null;
   const badge = SOURCE_KIND[src.kind] ?? SOURCE_KIND.unsupported;
   const hasPlayer =
@@ -149,16 +152,9 @@ function PlaybackPanel({ report }: { report: ReportData }) {
         </div>
       )}
 
-      {src.kind === "youtube" && src.embedUrl && (
-        <div className="mt-4 overflow-hidden rounded-lg border border-line">
-          <iframe
-            src={src.embedUrl}
-            title="YouTube player"
-            className="aspect-video w-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            referrerPolicy="strict-origin-when-cross-origin"
-          />
+      {src.kind === "youtube" && videoId && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-line bg-pit">
+          <div ref={ytDivRef} className="aspect-video w-full" />
         </div>
       )}
 
@@ -188,6 +184,27 @@ function PlaybackPanel({ report }: { report: ReportData }) {
 
 export function ReportView({ report, audio }: { report: ReportData; audio: HTMLAudioElement | null }) {
   const { meta } = report;
+
+  // YouTube instrumented-player bridge: real duration + synced time + seek
+  const [yt, setYt] = useState<{ duration: number | null; time: number }>({ duration: null, time: 0 });
+  const ytSeekRef = useRef<(t: number) => void>(() => {});
+
+  // fresh report → drop the previous player's state so nothing leaks across runs
+  useEffect(() => {
+    setYt({ duration: null, time: 0 });
+    ytSeekRef.current = () => {};
+  }, [meta.analyzedAt]);
+  const ytBridge: YouTubeBridge = {
+    onDuration: (d) => setYt((m) => (m.duration === d ? m : { ...m, duration: d })),
+    onTime: (t) => setYt((m) => (Math.abs(m.time - t) < 0.05 ? m : { ...m, time: t })),
+    onSeekReady: (fn) => {
+      ytSeekRef.current = fn;
+    },
+  };
+  const isYouTube = meta.source.kind === "youtube";
+  const ytExternal = !audio && isYouTube
+    ? { duration: yt.duration, time: yt.time, seek: (t: number) => ytSeekRef.current(t) }
+    : null;
 
   // provenance tally
   const tally: Record<Tier, number> = { measured: 0, computed: 0, estimated: 0, guessed: 0 };
@@ -236,7 +253,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                 </span>
                 {[
                   meta.fileName !== "—" ? meta.fileName : null,
-                  meta.durationSec !== null ? formatTime(meta.durationSec) : null,
+                  meta.durationSec !== null
+                    ? formatTime(meta.durationSec)
+                    : yt.duration !== null
+                      ? `${formatTime(yt.duration)} · from player`
+                      : null,
                   meta.sampleRate !== null ? `${(meta.sampleRate / 1000).toFixed(1)} kHz` : null,
                   meta.channels !== null ? `${meta.channels} ch` : null,
                 ]
@@ -294,7 +315,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
 
       {/* source playback */}
       <Reveal delay={40}>
-        <PlaybackPanel report={report} />
+        <PlaybackPanel report={report} ytBridge={ytBridge} />
       </Reveal>
 
       {/* readout strip */}
@@ -304,8 +325,12 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           <Readout label="Key" value={report.keySig.value} finding={report.keySig} />
           <Readout
             label="Length"
-            value={meta.durationSec !== null ? formatTime(meta.durationSec) : null}
-            finding={{ value: meta.durationSec, tier: "measured", source: "audio buffer duration" }}
+            value={(meta.durationSec ?? yt.duration) !== null ? formatTime((meta.durationSec ?? yt.duration) as number) : null}
+            finding={{
+              value: meta.durationSec ?? yt.duration,
+              tier: "measured",
+              source: meta.durationSec !== null ? "audio buffer duration" : "official player metadata",
+            }}
           />
           <Readout
             label="Sections"
@@ -322,7 +347,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
       </Reveal>
 
       {/* structure + energy */}
-      {(report.energy || report.sections.length > 0) && (
+      {(report.energy || report.sections.length > 0 || ytExternal !== null) && (
       <Reveal delay={80}>
         <div className="panel px-5 py-5 sm:px-6">
           <PanelHeader

@@ -24,14 +24,23 @@ function curvePath(curve: number[]): { area: string; line: string } {
   return { area, line };
 }
 
+export interface ExternalPlayback {
+  duration: number | null;
+  time: number;
+  seek: (t: number) => void;
+}
+
 export function Timeline({
   report,
   audio,
+  external,
 }: {
   report: ReportData;
   audio: HTMLAudioElement | null;
+  external?: ExternalPlayback | null;
 }) {
-  const duration = report.meta.durationSec ?? 0;
+  const hasPlayback = !!audio || !!external;
+  const duration = report.meta.durationSec ?? external?.duration ?? 0;
   const sections = report.sections;
   const curve = report.energy?.curve ?? null;
   const reduced = useReducedMotion();
@@ -70,13 +79,17 @@ export function Timeline({
   }, [audio, playing, reduced]);
 
   const seekTo = (t: number) => {
-    if (!audio) return;
-    audio.currentTime = Math.max(0, Math.min(duration - 0.05, t));
-    setTime(audio.currentTime);
+    const target = Math.max(0, Math.min(duration - 0.05, t));
+    if (audio) {
+      audio.currentTime = target;
+      setTime(audio.currentTime);
+    } else if (external) {
+      external.seek(target);
+    }
   };
 
   const onBodyClick = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!audio || !duration) return;
+    if (!hasPlayback || !duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const ratio = (e.clientX - rect.left) / rect.width;
     seekTo(ratio * duration);
@@ -89,7 +102,8 @@ export function Timeline({
   };
 
   const paths = curve ? curvePath(curve) : null;
-  const pct = duration > 0 ? (time / duration) * 100 : 0;
+  const playTime = audio ? time : (external?.time ?? 0);
+  const pct = duration > 0 ? (playTime / duration) * 100 : 0;
   const activeSection = active !== null ? sections[active] : null;
 
   return (
@@ -99,18 +113,18 @@ export function Timeline({
         ref={bodyRef}
         onClick={onBodyClick}
         className={`relative h-28 overflow-hidden rounded-lg border border-linesoft bg-pit ${
-          audio ? "cursor-crosshair" : "opacity-90"
+          hasPlayback ? "cursor-crosshair" : "opacity-90"
         }`}
         role="slider"
         aria-label="Seek position"
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(time)}
-        tabIndex={audio ? 0 : -1}
+        aria-valuenow={Math.round(playTime)}
+        tabIndex={hasPlayback ? 0 : -1}
         onKeyDown={(e) => {
-          if (!audio) return;
-          if (e.key === "ArrowRight") seekTo(time + 5);
-          if (e.key === "ArrowLeft") seekTo(time - 5);
+          if (!hasPlayback) return;
+          if (e.key === "ArrowRight") seekTo(playTime + 5);
+          if (e.key === "ArrowLeft") seekTo(playTime - 5);
         }}
       >
         {/* energy curve */}
@@ -160,7 +174,7 @@ export function Timeline({
           })}
 
         {/* playhead */}
-        {audio && duration > 0 && (
+        {hasPlayback && duration > 0 && (
           <div
             className="pointer-events-none absolute inset-y-0 z-10"
             style={{ left: `${pct}%` }}
@@ -174,10 +188,10 @@ export function Timeline({
           </div>
         )}
 
-        {!audio && (
-          <div className="absolute inset-0 flex items-center justify-center">
+        {!hasPlayback && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <span className="rounded-full border border-line bg-panel px-3 py-1 font-mono text-[10px] tracking-[0.14em] text-dim">
-              NO LOCAL AUDIO — REMOTE REPORT ONLY
+              {sections.length > 0 ? "HOVER TO INSPECT — NO PLAYBACK SOURCE" : "NO PLAYBACK SOURCE"}
             </span>
           </div>
         )}
@@ -199,7 +213,7 @@ export function Timeline({
         </button>
 
         <span className="font-mono text-xs text-dim">
-          <span className="text-ink">{formatTime(time)}</span> / {formatTime(duration)}
+          <span className="text-ink">{formatTime(playTime)}</span> / {formatTime(duration)}
         </span>
 
         <div className="ml-auto flex min-w-0 items-center gap-2">
@@ -215,7 +229,11 @@ export function Timeline({
             </>
           ) : (
             <span className="font-mono text-[10px] tracking-[0.12em] text-faint">
-              {audio ? "HOVER OR CLICK A SECTION" : "SECTIONS FROM BACKEND REPORT"}
+              {audio
+                ? "HOVER OR CLICK A SECTION"
+                : external
+                  ? "CLICK TIMELINE OR SECTIONS — THE VIDEO JUMPS"
+                  : "SECTIONS FROM BACKEND REPORT"}
             </span>
           )}
         </div>

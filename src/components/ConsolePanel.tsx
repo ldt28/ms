@@ -325,6 +325,14 @@ export function ConsolePanel(props: {
                 REMOVE
               </button>
             </div>
+          ) : linkInfo && linkInfo.kind !== "direct" && linkInfo.analysisReady === false ? (
+            <div>
+              <div className="font-mono text-xs font-semibold text-mint">Drop this track’s audio file here</div>
+              <div className="mt-1 font-mono text-[10px] leading-relaxed text-dim">
+                Unlocks tempo, key, energy & sections for{" "}
+                <span className="text-ink">{linkInfo.title ?? "this link"}</span> — the report stays bound to the video.
+              </div>
+            </div>
           ) : (
             <div>
               <div className="font-mono text-xs text-ink">Drop audio here or click to browse</div>
@@ -332,9 +340,14 @@ export function ConsolePanel(props: {
             </div>
           )}
         </div>
-        {linkInfo && (
+        {linkInfo?.kind === "direct" && (
           <p className="mt-1.5 font-mono text-[9.5px] text-cyanx/80">
-            Link source active — uploading a file will replace it.
+            Direct audio link active — uploading a file will replace it.
+          </p>
+        )}
+        {linkInfo && linkInfo.kind !== "direct" && linkInfo.analysisReady === false && (
+          <p className="mt-1.5 font-mono text-[9.5px] text-mint/80">
+            Video link bound — add its audio file above for the full breakdown, or paste lyrics / transcript for text metrics.
           </p>
         )}
       </div>

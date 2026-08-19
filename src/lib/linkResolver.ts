@@ -99,7 +99,7 @@ async function resolveYouTube(url: string, host: string): Promise<LinkInfo> {
     thumbnail: (j?.thumbnail_url as string) ?? `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
     embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
     analysisReady: false,
-    note: "Played via the official YouTube embed. Signal does not extract or download streams, so tempo / key / structure are unavailable for this source — paste lyrics for text metrics.",
+    note: "Played via the official player — the timeline below jumps the video, and the length is read from YouTube itself. Streams are encrypted, so no tool can decode audio from this URL: drop the track’s audio file into the console to unlock tempo / key / sections (the report stays bound to this video), or paste the video’s transcript (⋯ under the video → Show transcript) for lyric metrics.",
   };
 }
 
