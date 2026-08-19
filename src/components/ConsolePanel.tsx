@@ -18,6 +18,42 @@ If the signal drops then we rewind,
 Play it back until we lose our minds.`;
 
 export type EngineMode = "browser" | "backend";
+
+const START_CMDS = ["cd backend", "source venv/bin/activate", "uvicorn main:app --reload --port 8000"];
+
+function StartCommands() {
+  const [copied, setCopied] = useState(false);
+  const copyAll = async () => {
+    try {
+      await navigator.clipboard.writeText(START_CMDS.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopied(false);
+    }
+  };
+  return (
+    <span className="mt-2 block rounded-md border border-line bg-pit px-3 py-2.5">
+      <span className="flex flex-col gap-1">
+        {START_CMDS.map((c, i) => (
+          <span key={c} className="flex items-center gap-2">
+            <span className="font-mono text-[9px] text-faint">{i + 1}.</span>
+            <code className="font-mono text-[10.5px] text-mint">{c}</code>
+          </span>
+        ))}
+        <span className="font-mono text-[9px] leading-relaxed text-faint">
+          Windows: venv\Scripts\activate — or just run backend/start.sh / start.bat once.
+        </span>
+      </span>
+      <button
+        onClick={copyAll}
+        className="mt-2 rounded border border-line px-2 py-0.5 font-mono text-[9px] tracking-[0.12em] text-dim transition hover:border-amber/60 hover:text-amber"
+      >
+        {copied ? "COPIED — PASTE IN TERMINAL" : "COPY ALL 3"}
+      </button>
+    </span>
+  );
+}
 export type LinkStatus = "idle" | "loading" | "error";
 
 const KIND_BADGE: Record<string, { label: string; cls: string }> = {
@@ -335,10 +371,12 @@ export function ConsolePanel(props: {
                 {ping === "checking" && "Checking connection to /api/health…"}
                 {ping === "ok" && "Backend reachable — reports will come from your Python server."}
                 {ping === "fail" && (
-                  <>
-                    Not reachable at this address. Start uvicorn (BUILD PLAN → phase 04), check the port, or allow CORS.
-                    Analysis will fall back to the browser engine.
-                  </>
+                  <span className="block">
+                    Not reachable — nothing is listening there. The corrected backend ships in this project's{" "}
+                    <code className="text-ink">backend/</code> folder. Start it:
+                    <StartCommands />
+                    Still red? Check the port and BUILD PLAN → phase 07 (CORS, busy ports).
+                  </span>
                 )}
               </span>
             </div>

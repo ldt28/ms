@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+
+# Optional vocal transcription (uncomment or: pip install faster-whisper)
+# faster-whisper

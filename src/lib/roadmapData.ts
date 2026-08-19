@@ -49,8 +49,8 @@ export const PHASES: Phase[] = [
     title: "Add the project files",
     where: "Your code editor",
     steps: [
-      { id: "p2-1", text: "In backend/, place the corrected files: main.py · audio_analysis.py · lyrics_analysis.py · report.py · transcription.py · requirements.txt" },
-      { id: "p2-2", text: "Verify the fixes landed: “from __future__ import annotations”, “0.693”, “if __name__ == \"__main__\":”, and trimmed keys like \"tempo\" (no trailing spaces)" },
+      { id: "p2-1", text: "The corrected backend now ships in this project's backend/ folder: main.py · audio_analysis.py · lyrics_analysis.py · report.py · transcription.py · requirements.txt — plus start.sh / start.bat launchers" },
+      { id: "p2-2", text: "Copy that folder next to this app. It needs only fastapi, uvicorn, python-multipart and numpy — FFmpeg covers MP3/M4A decoding" },
       { id: "p2-3", text: "In frontend/, place index.html (or use this Signal workbench instead)" },
     ],
   },

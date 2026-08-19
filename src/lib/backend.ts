@@ -77,7 +77,7 @@ export async function postToBackend(endpoint: string, payload: BackendPayload): 
   const key = str(j.key?.value) ?? str(j.key) ?? str(j.key_mode) ?? str(j.audio?.key);
   const duration = num(j.duration) ?? num(j.duration_seconds) ?? num(j.audio?.duration);
 
-  if (tempo === null && key === null && duration === null) {
+  if (tempo === null && key === null && duration === null && !str(j.audio_error)) {
     throw new Error("Backend returned an unexpected report shape — no tempo, key or duration found.");
   }
 
