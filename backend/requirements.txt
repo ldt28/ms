@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+
+# Optional vocal transcription (uncomment or: pip install faster-whisper)
+# faster-whisper
+
+# Optional YouTube audio conversion on YOUR backend — only for content you
+# own or are licensed to use (pip install yt-dlp)
+# yt-dlp
