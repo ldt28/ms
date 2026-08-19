@@ -1,6 +1,67 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { formatBytes, type PingState } from "../lib/types";
 import type { LinkInfo } from "../lib/linkResolver";
+
+function TerminalExplainer() {
+  const [open, setOpen] = useState(false);
+  const os = useMemo(() => {
+    const ua = navigator.userAgent;
+    if (/Win/i.test(ua)) return "windows";
+    if (/Mac/i.test(ua)) return "mac";
+    return "linux";
+  }, []);
+
+  const steps =
+    os === "windows"
+      ? [
+          "Press the Windows key (bottom-left of your keyboard).",
+          "Type “PowerShell” and click it when it appears.",
+          "Type each command from the box above, pressing Enter after every line.",
+        ]
+      : os === "mac"
+        ? [
+            "Press ⌘ Command + Space at the same time.",
+            "Type “Terminal” and press Enter.",
+            "Type each command from the box above, pressing Enter after every line.",
+          ]
+        : [
+            "Press Ctrl + Alt + T to open a terminal.",
+            "Type each command from the box above, pressing Enter after every line.",
+          ];
+
+  return (
+    <span className="mt-2 block">
+      <button
+        onClick={() => setOpen(!open)}
+        className="font-mono text-[10px] text-cyanx underline decoration-cyanx/50 underline-offset-2 transition hover:text-ink"
+      >
+        {open ? "Hide terminal help" : "What's a terminal? How do I open one?"}
+      </button>
+      {open && (
+        <span className="mt-2 block rounded-md border border-cyanx/30 bg-pit px-3 py-2.5 text-left">
+          <span className="block text-[11px] leading-relaxed text-dim">
+            A terminal is just a plain text window on your computer where you type commands and press Enter. It is the
+            only part of Signal that can't live inside this webpage.
+          </span>
+          <span className="mt-2 block font-mono text-[9.5px] font-bold tracking-[0.16em] text-cyanx">
+            ON {os.toUpperCase()}:
+          </span>
+          <span className="mt-1 flex flex-col gap-1">
+            {steps.map((s, i) => (
+              <span key={i} className="flex gap-2 text-[11px] leading-snug text-dim">
+                <span className="font-mono text-[10px] font-bold text-cyanx">{i + 1}.</span>
+                {s}
+              </span>
+            ))}
+          </span>
+          <span className="mt-2 block font-mono text-[9.5px] leading-relaxed text-faint">
+            Honestly though — you don't need any of this. BROWSER DSP mode is the whole app.
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
 
 export const SAMPLE_LYRICS = `Neon rain on the boulevard screen,
 I been chasing down a drum machine,
@@ -332,17 +393,23 @@ export function ConsolePanel(props: {
             <button
               key={m}
               onClick={() => setEngine(m)}
-              className={`seg-btn px-3 py-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] ${
+              className={`seg-btn relative px-3 py-2 font-mono text-[10.5px] font-semibold tracking-[0.14em] ${
                 engine === m ? "bg-amber text-[#221503]" : "bg-pit text-dim hover:text-ink"
               }`}
             >
               {m === "browser" ? "BROWSER DSP" : "PYTHON BACKEND"}
+              {m === "browser" && (
+                <span className="absolute -top-0 right-2 top-0 rounded-b-sm bg-mint px-1 py-px font-mono text-[7.5px] font-bold tracking-[0.08em] text-[#06231a]">
+                  RECOMMENDED
+                </span>
+              )}
             </button>
           ))}
         </div>
         {engine === "browser" ? (
           <p className="mt-2 font-mono text-[9.5px] leading-relaxed text-faint">
-            Real DSP in this tab: decode → onset envelope → tempo autocorrelation → chroma key → sections. Nothing leaves your machine.
+            No setup, no terminal — this IS the whole app. Real DSP in this tab: decode → tempo autocorrelation →
+            chroma key → sections. Nothing leaves your machine.
           </p>
         ) : (
           <>
@@ -372,10 +439,23 @@ export function ConsolePanel(props: {
                 {ping === "ok" && "Backend reachable — reports will come from your Python server."}
                 {ping === "fail" && (
                   <span className="block">
-                    Not reachable — nothing is listening there. The corrected backend ships in this project's{" "}
-                    <code className="text-ink">backend/</code> folder. Start it:
-                    <StartCommands />
-                    Still red? Check the port and BUILD PLAN → phase 07 (CORS, busy ports).
+                    Not reachable — nothing is listening there. <strong className="text-ink">That's okay:</strong>{" "}
+                    BROWSER DSP mode does everything without a server.
+                    <span className="mt-2 block">
+                      <button
+                        onClick={() => setEngine("browser")}
+                        className="rounded-md border border-mint/50 bg-mint/12 px-3 py-1.5 font-mono text-[10px] font-bold tracking-[0.12em] text-mint transition hover:bg-mint/20"
+                      >
+                        USE BROWSER ENGINE INSTEAD →
+                      </button>
+                    </span>
+                    <TerminalExplainer />
+                    <span className="mt-2 block text-[10px] leading-relaxed text-dim/80">
+                      Only if you want the optional extras (vocal transcription, server-side DSP): start uvicorn from
+                      the project's <code className="text-ink">backend/</code> folder —
+                      <StartCommands />
+                      Still red? Check the port and BUILD PLAN → phase 07 (CORS, busy ports).
+                    </span>
                   </span>
                 )}
               </span>
