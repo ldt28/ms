@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import type { LyricsBlock, PingState, ReportData } from "./lib/types";
+import type { LyricsBlock, PingState, ReportData, ReportSource } from "./lib/types";
 import { analyzeAudioFile, AnalysisError, type AudioAnalysisResult } from "./lib/audioEngine";
 import { analyzeLyrics } from "./lib/lyricsEngine";
 import { postToBackend } from "./lib/backend";
-import { ConsolePanel, type EngineMode } from "./components/ConsolePanel";
+import { resolveLink, type LinkInfo } from "./lib/linkResolver";
+import { ConsolePanel, type EngineMode, type LinkStatus } from "./components/ConsolePanel";
 import { ReportView } from "./components/ReportView";
 import { Roadmap } from "./components/Roadmap";
 import { EqBars, FlatlineBlip, Reveal, Scope, useReducedMotion } from "./components/ui";
@@ -44,6 +45,12 @@ export default function App() {
   const [engine, setEngine] = useState<EngineMode>(() => (loadStr("signal.engine", "browser") === "backend" ? "backend" : "browser"));
   const [endpoint, setEndpoint] = useState(() => loadStr("signal.endpoint", "http://localhost:8000"));
 
+  // link state
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkInfo, setLinkInfo] = useState<LinkInfo | null>(null);
+  const [linkStatus, setLinkStatus] = useState<LinkStatus>("idle");
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   // run state
   const [status, setStatus] = useState<Status>("idle");
   const [plan, setPlan] = useState<string[]>(BROWSER_PLAN);
@@ -51,11 +58,11 @@ export default function App() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [fallbackNote, setFallbackNote] = useState<string | null>(null);
 
-  // playback element for the uploaded file
+  // playback element for the current source
   const [audioEl, setAudioEl] = useState<HTMLAudioElement | null>(null);
   const reportWrapRef = useRef<HTMLDivElement>(null);
 
-  // live backend reachability check (answers "why is it not working?" up front)
+  // live backend reachability check
   const [ping, setPing] = useState<PingState>("idle");
   useEffect(() => {
     if (engine !== "backend") {
@@ -81,48 +88,125 @@ export default function App() {
     };
   }, [engine, endpoint]);
 
-  const canRun = !!file || lyrics.trim().length > 0;
+  // ---------- source exclusivity: file XOR link ----------
+  const setFileExclusive = (f: File | null) => {
+    setFile(f);
+    if (f) {
+      setLinkInfo(null);
+      setLinkError(null);
+      setLinkStatus("idle");
+    }
+  };
 
-  useEffect(() => {
+  const applyResolvedLink = (info: LinkInfo) => {
+    setLinkInfo(info);
+    setLinkStatus("idle");
+    setLinkError(null);
+    setFile(null);
+  };
+
+  const handleLoadLink = async () => {
+    const raw = linkUrl.trim();
+    if (!raw || linkStatus === "loading") return;
+    setLinkStatus("loading");
+    setLinkError(null);
     try {
-      localStorage.setItem("signal.engine", engine);
-      localStorage.setItem("signal.endpoint", endpoint);
-    } catch { /* ignore */ }
-  }, [engine, endpoint]);
+      applyResolvedLink(await resolveLink(raw));
+    } catch (err) {
+      setLinkInfo(null);
+      setLinkStatus("error");
+      setLinkError(err instanceof Error ? err.message : "Couldn’t resolve that link.");
+    }
+  };
 
+  const handlePasteLink = async () => {
+    let text = "";
+    try {
+      text = (await navigator.clipboard.readText()).trim();
+    } catch {
+      setLinkStatus("error");
+      setLinkError("Clipboard access was blocked by the browser — paste manually into the field.");
+      return;
+    }
+    if (!text) return;
+    setLinkUrl(text);
+    setLinkStatus("loading");
+    setLinkError(null);
+    try {
+      applyResolvedLink(await resolveLink(text));
+    } catch (err) {
+      setLinkInfo(null);
+      setLinkStatus("error");
+      setLinkError(err instanceof Error ? err.message : "Couldn’t resolve that link.");
+    }
+  };
+
+  const handleClearLink = () => {
+    setLinkInfo(null);
+    setLinkError(null);
+    setLinkStatus("idle");
+  };
+
+  // ---------- playback element ----------
   useEffect(() => {
-    if (!file) {
+    let blobUrl: string | null = null;
+    let src: string | null = null;
+    if (file) {
+      blobUrl = URL.createObjectURL(file);
+      src = blobUrl;
+    } else if (linkInfo?.kind === "direct") {
+      src = linkInfo.url;
+    }
+    if (!src) {
       setAudioEl(null);
       return;
     }
-    const url = URL.createObjectURL(file);
-    const el = new Audio(url);
+    const el = new Audio(src);
     el.preload = "auto";
     setAudioEl(el);
     return () => {
       el.pause();
-      URL.revokeObjectURL(url);
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
     };
-  }, [file]);
+  }, [file, linkInfo]);
+
+  const canRun = !!file || !!linkInfo || lyrics.trim().length > 0;
+
+  const sourceMeta: ReportSource = linkInfo
+    ? {
+        kind: linkInfo.kind === "direct" ? "direct-link" : linkInfo.kind,
+        url: linkInfo.url,
+        host: linkInfo.host,
+        title: linkInfo.title,
+        artist: linkInfo.artist,
+        thumbnail: linkInfo.thumbnail,
+        embedUrl: linkInfo.embedUrl,
+        note: linkInfo.note,
+      }
+    : { kind: "file" };
 
   const buildBrowserReport = async (): Promise<ReportData> => {
     setPlan(BROWSER_PLAN);
-    const hasAudio = !!file;
+    const analysisTarget = file ?? linkInfo?.audioFile ?? null;
+    const hasAudio = !!analysisTarget;
     const hasLyrics = lyrics.trim().length > 0;
 
     let audio: AudioAnalysisResult | null = null;
     let audioError: string | null = null;
-    if (hasAudio && file) {
+    if (hasAudio && analysisTarget) {
       try {
-        audio = await analyzeAudioFile(file, setStage);
+        audio = await analyzeAudioFile(analysisTarget, setStage);
       } catch (err) {
         audioError =
           err instanceof AnalysisError
             ? err.message
-            : "Unexpected audio failure — the file may be corrupted.";
+            : "Unexpected audio failure — the source may be corrupted.";
       }
+    } else if (linkInfo) {
+      audioError =
+        linkInfo.note ?? "Audio analysis is unavailable for this link source.";
     } else {
-      audioError = "No audio file supplied — the audio section of this report is unavailable. Add a file and re-run.";
+      audioError = "No audio source supplied — the audio section of this report is unavailable. Add a file or link and re-run.";
     }
 
     setStage("Scoring lyrics");
@@ -147,19 +231,25 @@ export default function App() {
     setStage("Assembling report");
     await new Promise((r) => setTimeout(r, 60));
 
+    const warnings = [...(audio?.notes ?? [])];
+    if (linkInfo && linkInfo.kind === "direct" && !linkInfo.analysisReady && linkInfo.note) {
+      warnings.push(linkInfo.note);
+    }
+
     return {
       meta: {
-        title: title.trim() || "Untitled track",
-        artist: artist.trim() || "Unknown artist",
-        fileName: file?.name ?? "—",
+        title: title.trim() || linkInfo?.title || "Untitled track",
+        artist: artist.trim() || linkInfo?.artist || "Unknown artist",
+        fileName: file?.name ?? (linkInfo ? linkInfo.host : "—"),
         durationSec: audio?.durationSec ?? null,
         sampleRate: audio?.sampleRate ?? null,
         channels: audio?.channels ?? null,
         engine: "browser",
         analyzedAt: Date.now(),
+        source: sourceMeta,
       },
-      tempo: audio?.tempo ?? { value: null, tier: "measured", source: "unavailable — no audio", note: audioError ?? undefined },
-      keySig: audio?.keySig ?? { value: null, tier: "estimated", source: "unavailable — no audio" },
+      tempo: audio?.tempo ?? { value: null, tier: "measured", source: "unavailable — no decodable audio", note: audioError ?? undefined },
+      keySig: audio?.keySig ?? { value: null, tier: "estimated", source: "unavailable — no decodable audio" },
       energy: audio?.energy ?? null,
       texture: audio?.texture ?? null,
       sections: audio?.sections ?? [],
@@ -167,8 +257,8 @@ export default function App() {
       audioError,
       lyricsError,
       transcriptionError,
-      warnings: audio?.notes ?? [],
-      audioUrl: null,
+      warnings,
+      audioUrl: linkInfo?.kind === "direct" ? linkInfo.url : null,
     };
   };
 
@@ -186,8 +276,15 @@ export default function App() {
 
       if (engine === "backend") {
         try {
-          const rep = await postToBackend(endpoint, { title, artist, lyrics, transcribe, file });
-          // prefer real local duration for the timeline if the backend omitted it
+          const rep = await postToBackend(endpoint, {
+            title,
+            artist,
+            lyrics,
+            transcribe,
+            file,
+            audioUrl: linkInfo?.url ?? null,
+            source: sourceMeta,
+          });
           if (rep.meta.durationSec === null && rep.sections.length > 0) {
             rep.meta.durationSec = Math.max(...rep.sections.map((s) => s.end));
           }
@@ -229,7 +326,7 @@ export default function App() {
             </span>
             <div>
               <div className="font-display text-lg leading-none tracking-wide text-ink">SIGNAL</div>
-              <div className="mt-0.5 font-mono text-[9px] tracking-[0.28em] text-dim">SONG BREAKDOWN · MVP 0.1</div>
+              <div className="mt-0.5 font-mono text-[9px] tracking-[0.28em] text-dim">SONG BREAKDOWN · MVP 0.2</div>
             </div>
           </div>
 
@@ -282,7 +379,7 @@ export default function App() {
                 artist={artist}
                 setArtist={setArtist}
                 file={file}
-                setFile={setFile}
+                setFile={setFileExclusive}
                 lyrics={lyrics}
                 setLyrics={setLyrics}
                 transcribe={transcribe}
@@ -295,6 +392,14 @@ export default function App() {
                 canRun={canRun}
                 running={status === "running"}
                 onAnalyze={runAnalysis}
+                linkUrl={linkUrl}
+                setLinkUrl={setLinkUrl}
+                linkStatus={linkStatus}
+                linkError={linkError}
+                linkInfo={linkInfo}
+                onLoadLink={handleLoadLink}
+                onClearLink={handleClearLink}
+                onPasteLink={handlePasteLink}
               />
             </div>
 
@@ -364,9 +469,9 @@ export default function App() {
                       <span className="cursor-blink ml-2 inline-block h-[0.72em] w-[0.45em] translate-y-[0.08em] bg-amber/80" />
                     </h2>
                     <p className="mt-4 max-w-xl text-sm leading-relaxed text-dim">
-                      Drop a track in the console and Signal will break it down — tempo, key, structure, energy and
-                      lyric metrics — with every number labeled by how it was produced. Measured facts on the left,
-                      guesses clearly on the right.
+                      Drop a track in the console — or paste a link. Direct audio URLs are fetched and broken down
+                      locally; YouTube, Spotify and SoundCloud links are read and played through their official
+                      players. Every number stays labeled by how it was produced.
                     </p>
 
                     <div className="mt-6">
@@ -375,7 +480,7 @@ export default function App() {
 
                     <ol className="mt-8 flex max-w-xl flex-col gap-3">
                       {[
-                        ["01", "Add an audio file", "WAV / MP3 / FLAC — decoded locally, never uploaded in browser mode."],
+                        ["01", "Add a file or paste a link", "WAV / MP3 / FLAC uploads, direct audio URLs, or YouTube / Spotify / SoundCloud links."],
                         ["02", "Paste lyrics (or don’t)", "Text powers rhyme, flow and hook metrics. Fragments only, never full lyrics."],
                         ["03", "Run analysis", "Browser DSP works instantly; switch to the Python backend for transcription."],
                       ].map(([n, t, d]) => (
@@ -403,7 +508,7 @@ export default function App() {
             SIGNAL · measured ≠ estimated ≠ guessed — every number carries its source.
           </p>
           <p className="font-mono text-[10px] tracking-[0.08em] text-faint">
-            NO URL RIPS · NO FULL-LYRIC REDISPLAY · FAILURES STAY LOUD
+            NO STREAM RIPS · NO FULL-LYRIC REDISPLAY · FAILURES STAY LOUD
           </p>
         </div>
       </footer>

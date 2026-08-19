@@ -41,6 +41,18 @@ export interface LyricsBlock {
   hooks: Hook[];
 }
 
+export interface ReportSource {
+  kind: "file" | "direct-link" | "youtube" | "spotify" | "soundcloud" | "unsupported";
+  url?: string;
+  host?: string;
+  title?: string;
+  artist?: string;
+  thumbnail?: string;
+  /** playable official embed (YouTube / Spotify / SoundCloud) */
+  embedUrl?: string;
+  note?: string | null;
+}
+
 export interface ReportData {
   meta: {
     title: string;
@@ -51,6 +63,7 @@ export interface ReportData {
     channels: number | null;
     engine: "browser" | "backend";
     analyzedAt: number;
+    source: ReportSource;
   };
   tempo: Finding<number>;
   keySig: Finding<string>;

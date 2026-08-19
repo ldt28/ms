@@ -1,10 +1,11 @@
 /**
  * Signal — Python backend client.
- * POSTs the same payload the FastAPI MVP expects, and defensively maps the
- * report JSON (keys are trimmed — the early report.py had trailing spaces).
+ * POSTs the same payload the FastAPI MVP expects (plus an audio_url field for
+ * link sources), and defensively maps the report JSON — keys are trimmed,
+ * because the early report.py had trailing spaces.
  */
 
-import type { Finding, ReportData, Section, Tier } from "./types";
+import type { Finding, ReportData, ReportSource, Section, Tier } from "./types";
 
 function trimKeys(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(trimKeys);
@@ -35,6 +36,8 @@ export interface BackendPayload {
   lyrics: string;
   transcribe: boolean;
   file: File | null;
+  audioUrl?: string | null;
+  source?: ReportSource;
 }
 
 export async function postToBackend(endpoint: string, payload: BackendPayload): Promise<ReportData> {
@@ -49,6 +52,7 @@ export async function postToBackend(endpoint: string, payload: BackendPayload): 
     fd.append("lyrics", payload.lyrics);
     fd.append("transcribe", payload.transcribe ? "true" : "false");
     if (payload.file) fd.append("audio", payload.file);
+    if (payload.audioUrl) fd.append("audio_url", payload.audioUrl);
     res = await fetch(`${endpoint.replace(/\/$/, "")}/api/analyze`, {
       method: "POST",
       body: fd,
@@ -101,16 +105,19 @@ export async function postToBackend(endpoint: string, payload: BackendPayload): 
   const warnings: string[] = [];
   if (Array.isArray(j.warnings)) for (const w of j.warnings) { const s = str(w); if (s) warnings.push(s); }
 
+  const src = payload.source ?? { kind: "file" as const };
+
   return {
     meta: {
-      title: payload.title || str(j.title) || "Untitled track",
-      artist: payload.artist || str(j.artist) || "Unknown artist",
-      fileName: payload.file?.name ?? str(j.file_name) ?? "—",
+      title: payload.title || str(j.title) || src.title || "Untitled track",
+      artist: payload.artist || str(j.artist) || src.artist || "Unknown artist",
+      fileName: payload.file?.name ?? (payload.audioUrl ? src.host ?? "link" : str(j.file_name) ?? "—"),
       durationSec: duration,
       sampleRate: num(j.sample_rate) ?? null,
       channels: num(j.channels) ?? null,
       engine: "backend",
       analyzedAt: Date.now(),
+      source: src,
     },
     tempo: {
       value: tempo !== null ? Math.round(tempo * 10) / 10 : null,
@@ -164,6 +171,6 @@ export async function postToBackend(endpoint: string, payload: BackendPayload): 
     lyricsError: str(j.lyrics_error),
     transcriptionError: str(j.transcription_error),
     warnings,
-    audioUrl: null,
+    audioUrl: str(j.audio_url) ?? payload.audioUrl ?? null,
   };
 }

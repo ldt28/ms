@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { formatBytes, type PingState } from "../lib/types";
+import type { LinkInfo } from "../lib/linkResolver";
 
 export const SAMPLE_LYRICS = `Neon rain on the boulevard screen,
 I been chasing down a drum machine,
@@ -17,6 +18,15 @@ If the signal drops then we rewind,
 Play it back until we lose our minds.`;
 
 export type EngineMode = "browser" | "backend";
+export type LinkStatus = "idle" | "loading" | "error";
+
+const KIND_BADGE: Record<string, { label: string; cls: string }> = {
+  direct: { label: "DIRECT AUDIO", cls: "border-mint/50 bg-mint/10 text-mint" },
+  youtube: { label: "YOUTUBE", cls: "border-rosex/50 bg-rosex/10 text-rosex" },
+  spotify: { label: "SPOTIFY", cls: "border-mint/50 bg-mint/10 text-mint" },
+  soundcloud: { label: "SOUNDCLOUD", cls: "border-amber/50 bg-amber/10 text-amber" },
+  unsupported: { label: "BLOCKED", cls: "border-slatex/50 bg-slatex/10 text-slatex" },
+};
 
 export function ConsolePanel(props: {
   title: string;
@@ -37,10 +47,19 @@ export function ConsolePanel(props: {
   canRun: boolean;
   running: boolean;
   onAnalyze: () => void;
+  linkUrl: string;
+  setLinkUrl: (v: string) => void;
+  linkStatus: LinkStatus;
+  linkError: string | null;
+  linkInfo: LinkInfo | null;
+  onLoadLink: () => void;
+  onClearLink: () => void;
+  onPasteLink: () => void;
 }) {
   const {
     title, setTitle, artist, setArtist, file, setFile, lyrics, setLyrics,
     transcribe, setTranscribe, engine, setEngine, endpoint, setEndpoint, ping, canRun, running, onAnalyze,
+    linkUrl, setLinkUrl, linkStatus, linkError, linkInfo, onLoadLink, onClearLink, onPasteLink,
   } = props;
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -48,12 +67,10 @@ export function ConsolePanel(props: {
 
   const acceptFile = (f: File | undefined | null) => {
     if (!f) return;
-    if (!f.type.startsWith("audio/") && !/\.(wav|mp3|flac|m4a|ogg|aac|aiff|webm)$/i.test(f.name)) {
-      setFile(f); // still allow attempt — decode error will be explicit
-      return;
-    }
     setFile(f);
   };
+
+  const badge = linkInfo ? KIND_BADGE[linkInfo.kind] ?? KIND_BADGE.unsupported : null;
 
   return (
     <div className="panel ticks flex flex-col gap-5 px-5 py-5 sm:px-6">
@@ -72,6 +89,97 @@ export function ConsolePanel(props: {
           <span className="kicker mb-1.5 block">Artist</span>
           <input className="input" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Unknown artist" maxLength={80} />
         </label>
+      </div>
+
+      {/* ---------- source link ---------- */}
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="kicker">Source link (optional)</span>
+          <button
+            onClick={onPasteLink}
+            disabled={linkStatus === "loading"}
+            className="inline-flex items-center gap-1 font-mono text-[9.5px] tracking-[0.12em] text-cyanx transition hover:text-ink disabled:opacity-40"
+          >
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="8" y="2.5" width="8" height="4.5" rx="1" />
+              <path d="M16 5h2a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2" strokeLinejoin="round" />
+            </svg>
+            PASTE
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") onLoadLink(); }}
+            placeholder="https://… audio URL, YouTube, Spotify, SoundCloud"
+            spellCheck={false}
+          />
+          <button
+            onClick={onLoadLink}
+            disabled={linkStatus === "loading" || !linkUrl.trim()}
+            className="shrink-0 rounded-lg border border-amber/55 bg-amber/10 px-3 font-mono text-[10px] font-bold tracking-[0.14em] text-amber transition hover:bg-amber/20 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            {linkStatus === "loading" ? "…" : "LOAD"}
+          </button>
+        </div>
+        <p className="mt-1.5 font-mono text-[9.5px] leading-relaxed text-faint">
+          Direct audio URLs are fetched & analyzed locally · YouTube / Spotify / SoundCloud play via official embeds — never ripped.
+        </p>
+
+        {linkStatus === "loading" && (
+          <div className="mt-2 flex items-center gap-2 rounded-md border border-line bg-pit px-3 py-2">
+            <span className="pulse-dot h-2 w-2 rounded-full bg-amber text-amber" />
+            <span className="font-mono text-[10px] tracking-[0.08em] text-dim">Resolving link…</span>
+          </div>
+        )}
+
+        {linkStatus === "error" && linkError && (
+          <div className="mt-2 rounded-md border border-rosex/45 bg-rosex/8 px-3 py-2 font-mono text-[10px] leading-relaxed text-rosex">
+            {linkError}
+          </div>
+        )}
+
+        {linkInfo && badge && (
+          <div className="mt-2 flex items-center gap-3 rounded-lg border border-line bg-pit/80 px-3 py-2.5">
+            {linkInfo.thumbnail ? (
+              <img
+                src={linkInfo.thumbnail}
+                alt=""
+                className="h-10 w-10 shrink-0 rounded-md border border-line object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-line bg-panel">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-amber" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M10 13.5a4 4 0 0 0 6 .5l3-3a4 4 0 0 0-5.7-5.6L11.6 7" strokeLinecap="round" />
+                  <path d="M14 10.5a4 4 0 0 0-6-.5l-3 3a4 4 0 0 0 5.7 5.6l1.7-1.6" strokeLinecap="round" />
+                </svg>
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <span className={`inline-block rounded-full border px-2 py-0.5 font-mono text-[8.5px] font-bold tracking-[0.14em] ${badge.cls}`}>
+                {badge.label}
+              </span>
+              <div className="mt-1 truncate font-mono text-[11px] font-semibold text-ink">
+                {linkInfo.title ?? linkInfo.host}
+              </div>
+              <div className="truncate font-mono text-[9.5px] text-dim">
+                {linkInfo.artist ? `${linkInfo.artist} · ` : ""}
+                {linkInfo.host}
+                {linkInfo.bytes ? ` · ${formatBytes(linkInfo.bytes)}` : ""}
+                {linkInfo.kind === "unsupported" ? " · not readable" : ""}
+              </div>
+            </div>
+            <button
+              onClick={onClearLink}
+              className="shrink-0 rounded-md border border-line px-2 py-1 font-mono text-[10px] tracking-[0.1em] text-dim transition hover:border-rosex/60 hover:text-rosex"
+            >
+              REMOVE
+            </button>
+          </div>
+        )}
       </div>
 
       {/* audio dropzone */}
@@ -127,6 +235,11 @@ export function ConsolePanel(props: {
             </div>
           )}
         </div>
+        {linkInfo && (
+          <p className="mt-1.5 font-mono text-[9.5px] text-cyanx/80">
+            Link source active — uploading a file will replace it.
+          </p>
+        )}
       </div>
 
       {/* lyrics */}
@@ -238,8 +351,8 @@ export function ConsolePanel(props: {
       </button>
       <p className="-mt-2 text-center font-mono text-[9.5px] text-faint">
         {!canRun
-          ? "⚠ add an audio file or paste lyrics first — then run analysis"
-          : "audio + lyrics → full report · audio only → audio facts · lyrics only → text metrics"}
+          ? "⚠ add a file, a link, or lyrics first — then run analysis"
+          : "file / link + lyrics → full report · stream links → embed + text metrics"}
       </p>
     </div>
   );

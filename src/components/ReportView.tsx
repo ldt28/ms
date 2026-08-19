@@ -98,6 +98,94 @@ function Meter({
   );
 }
 
+const SOURCE_KIND: Record<string, { label: string; cls: string }> = {
+  file: { label: "FROM FILE", cls: "border-slatex/50 bg-slatex/10 text-slatex" },
+  "direct-link": { label: "DIRECT LINK", cls: "border-mint/50 bg-mint/10 text-mint" },
+  youtube: { label: "YOUTUBE", cls: "border-rosex/50 bg-rosex/10 text-rosex" },
+  spotify: { label: "SPOTIFY", cls: "border-mint/50 bg-mint/10 text-mint" },
+  soundcloud: { label: "SOUNDCLOUD", cls: "border-amber/50 bg-amber/10 text-amber" },
+  unsupported: { label: "UNSUPPORTED", cls: "border-rosex/50 bg-rosex/10 text-rosex" },
+};
+
+function PlaybackPanel({ report }: { report: ReportData }) {
+  const src = report.meta.source;
+  if (src.kind === "file") return null;
+  const badge = SOURCE_KIND[src.kind] ?? SOURCE_KIND.unsupported;
+  const hasPlayer =
+    (src.kind === "direct-link" && !!report.audioUrl) ||
+    ((src.kind === "youtube" || src.kind === "spotify" || src.kind === "soundcloud") && !!src.embedUrl);
+
+  return (
+    <div className="panel px-5 py-5 sm:px-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="kicker">Source playback</span>
+        <span className={`rounded-full border px-2.5 py-0.5 font-mono text-[9px] font-bold tracking-[0.14em] ${badge.cls}`}>
+          {badge.label}
+        </span>
+        {src.host && <span className="rounded-full border border-line bg-pit px-2.5 py-0.5 font-mono text-[10px] text-dim">{src.host}</span>}
+        {src.url && (
+          <a
+            href={src.url}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center gap-1 font-mono text-[10px] tracking-[0.1em] text-cyanx transition hover:text-ink"
+          >
+            OPEN ORIGINAL
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M7 17 17 7M9 7h8v8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        )}
+      </div>
+
+      {src.kind === "direct-link" && report.audioUrl && (
+        <div className="mt-4 flex items-center gap-4 rounded-lg border border-line bg-pit/70 px-4 py-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-mint/40 bg-mint/8">
+            <svg viewBox="0 0 24 24" className="h-5 w-5 text-mint" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M2 12h2l2-5 3 10 3-14 3 12 2.5-6H22" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+          <audio controls src={report.audioUrl} preload="metadata" className="min-w-0 flex-1" />
+        </div>
+      )}
+
+      {src.kind === "youtube" && src.embedUrl && (
+        <div className="mt-4 overflow-hidden rounded-lg border border-line">
+          <iframe
+            src={src.embedUrl}
+            title="YouTube player"
+            className="aspect-video w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            referrerPolicy="strict-origin-when-cross-origin"
+          />
+        </div>
+      )}
+
+      {(src.kind === "spotify" || src.kind === "soundcloud") && src.embedUrl && (
+        <iframe
+          src={src.embedUrl}
+          title={`${src.kind} player`}
+          className="mt-4 w-full rounded-lg border border-line"
+          style={{ height: src.kind === "spotify" ? 152 : 166 }}
+          allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+          loading="lazy"
+        />
+      )}
+
+      {!hasPlayer && (
+        <div className="mt-4 rounded-lg border border-rosex/40 bg-rosex/8 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex">
+          No player could be produced for this link — it may be private, region-blocked, or on an unsupported platform.
+        </div>
+      )}
+
+      {src.note && (
+        <p className="mt-3 font-mono text-[10px] leading-relaxed text-dim">{src.note}</p>
+      )}
+    </div>
+  );
+}
+
 export function ReportView({ report, audio }: { report: ReportData; audio: HTMLAudioElement | null }) {
   const { meta } = report;
 
@@ -137,22 +225,39 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
               </h2>
               <div className="mt-1 text-sm font-medium text-dim">{meta.artist}</div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                meta.fileName !== "—" ? meta.fileName : null,
-                meta.durationSec !== null ? formatTime(meta.durationSec) : null,
-                meta.sampleRate !== null ? `${(meta.sampleRate / 1000).toFixed(1)} kHz` : null,
-                meta.channels !== null ? `${meta.channels} ch` : null,
-              ]
-                .filter(Boolean)
-                .map((chip) => (
-                  <span
-                    key={chip as string}
-                    className="rounded-full border border-line bg-pit px-2.5 py-1 font-mono text-[10px] text-dim"
-                  >
-                    {chip}
-                  </span>
-                ))}
+            <div className="flex items-start gap-3">
+              <div className="flex flex-wrap justify-end gap-1.5">
+                <span
+                  className={`rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.14em] ${
+                    (SOURCE_KIND[meta.source.kind] ?? SOURCE_KIND.unsupported).cls
+                  }`}
+                >
+                  {(SOURCE_KIND[meta.source.kind] ?? SOURCE_KIND.unsupported).label}
+                </span>
+                {[
+                  meta.fileName !== "—" ? meta.fileName : null,
+                  meta.durationSec !== null ? formatTime(meta.durationSec) : null,
+                  meta.sampleRate !== null ? `${(meta.sampleRate / 1000).toFixed(1)} kHz` : null,
+                  meta.channels !== null ? `${meta.channels} ch` : null,
+                ]
+                  .filter(Boolean)
+                  .map((chip) => (
+                    <span
+                      key={chip as string}
+                      className="rounded-full border border-line bg-pit px-2.5 py-1 font-mono text-[10px] text-dim"
+                    >
+                      {chip}
+                    </span>
+                  ))}
+              </div>
+              {meta.source.thumbnail && (
+                <img
+                  src={meta.source.thumbnail}
+                  alt=""
+                  className="h-14 w-14 shrink-0 rounded-lg border border-line object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              )}
             </div>
           </div>
 
@@ -181,6 +286,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         </div>
       </Reveal>
 
+      {/* source playback */}
+      <Reveal delay={40}>
+        <PlaybackPanel report={report} />
+      </Reveal>
+
       {/* readout strip */}
       <Reveal delay={60}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
@@ -206,6 +316,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
       </Reveal>
 
       {/* structure + energy */}
+      {(report.energy || report.sections.length > 0) && (
       <Reveal delay={80}>
         <div className="panel px-5 py-5 sm:px-6">
           <PanelHeader
@@ -224,6 +335,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           <Timeline report={report} audio={audio} />
         </div>
       </Reveal>
+      )}
 
       {/* texture */}
       {report.texture && (
