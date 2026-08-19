@@ -193,6 +193,7 @@ export default function App() {
 
     let audio: AudioAnalysisResult | null = null;
     let audioError: string | null = null;
+    let audioNote: string | null = null;
     if (hasAudio && analysisTarget) {
       try {
         audio = await analyzeAudioFile(analysisTarget, setStage);
@@ -203,8 +204,13 @@ export default function App() {
             : "Unexpected audio failure — the source may be corrupted.";
       }
     } else if (linkInfo) {
-      audioError =
-        linkInfo.note ?? "Audio analysis is unavailable for this link source.";
+      if (linkInfo.embedUrl) {
+        // By design, not a failure: official-embed sources can't be decoded in-browser.
+        audioNote =
+          "This is expected, not an error: it plays via the official embed, and Signal refuses to extract or download streams. Tempo / key / structure metrics don't apply to this source by design — paste lyrics above to still get rhyme, flow and hook metrics.";
+      } else {
+        audioError = linkInfo.note ?? "Audio analysis is unavailable for this link source.";
+      }
     } else {
       audioError = "No audio source supplied — the audio section of this report is unavailable. Add a file or link and re-run.";
     }
@@ -255,6 +261,7 @@ export default function App() {
       sections: audio?.sections ?? [],
       lyrics: lyricsBlock,
       audioError,
+      audioNote,
       lyricsError,
       transcriptionError,
       warnings,
@@ -275,26 +282,38 @@ export default function App() {
       let finalReport: ReportData;
 
       if (engine === "backend") {
-        try {
-          const rep = await postToBackend(endpoint, {
-            title,
-            artist,
-            lyrics,
-            transcribe,
-            file,
-            audioUrl: linkInfo?.url ?? null,
-            source: sourceMeta,
-          });
-          if (rep.meta.durationSec === null && rep.sections.length > 0) {
-            rep.meta.durationSec = Math.max(...rep.sections.map((s) => s.end));
-          }
-          finalReport = rep;
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : "Backend call failed.";
-          setFallbackNote(`${msg} — fell back to the in-browser engine.`);
+        const fixHint =
+          " Fix: BUILD PLAN tab → phase 04 starts uvicorn, phase 07 covers ports & CORS.";
+        if (ping === "fail") {
+          // health dot already red — don't waste a network round-trip
+          setFallbackNote(
+            `Skipped the backend call: the last health ping to ${endpoint} failed, so the in-browser engine ran instead.${fixHint}`
+          );
           setStage("");
           finalReport = await buildBrowserReport();
-          finalReport.warnings = [`Backend attempt failed: ${msg}`, ...finalReport.warnings];
+          finalReport.warnings = ["Backend unreachable (health ping failed) — browser engine used instead.", ...finalReport.warnings];
+        } else {
+          try {
+            const rep = await postToBackend(endpoint, {
+              title,
+              artist,
+              lyrics,
+              transcribe,
+              file,
+              audioUrl: linkInfo?.url ?? null,
+              source: sourceMeta,
+            });
+            if (rep.meta.durationSec === null && rep.sections.length > 0) {
+              rep.meta.durationSec = Math.max(...rep.sections.map((s) => s.end));
+            }
+            finalReport = rep;
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Backend call failed.";
+            setFallbackNote(`${msg} — fell back to the in-browser engine.${fixHint}`);
+            setStage("");
+            finalReport = await buildBrowserReport();
+            finalReport.warnings = [`Backend attempt failed: ${msg}`, ...finalReport.warnings];
+          }
         }
       } else {
         finalReport = await buildBrowserReport();

@@ -168,6 +168,7 @@ export async function postToBackend(endpoint: string, payload: BackendPayload): 
         }
       : null,
     audioError: str(j.audio_error),
+    audioNote: str(j.audio_note),
     lyricsError: str(j.lyrics_error),
     transcriptionError: str(j.transcription_error),
     warnings,

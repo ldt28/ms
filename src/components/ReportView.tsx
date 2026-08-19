@@ -261,8 +261,14 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
             </div>
           </div>
 
-          {(report.audioError || report.transcriptionError || report.warnings.length > 0) && (
+          {(report.audioError || report.audioNote || report.transcriptionError || report.warnings.length > 0) && (
             <div className="mt-4 flex flex-col gap-2">
+              {report.audioNote && (
+                <div className="rounded-lg border border-cyanx/40 bg-cyanx/8 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-cyanx">
+                  <span className="font-bold tracking-[0.14em]">BY DESIGN · </span>
+                  {report.audioNote}
+                </div>
+              )}
               {report.audioError && (
                 <div className="rounded-lg border border-rosex/45 bg-rosex/10 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-rosex">
                   <span className="font-bold tracking-[0.14em]">AUDIO_ERROR · </span>

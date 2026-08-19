@@ -81,6 +81,8 @@ export interface ReportData {
   sections: Section[];
   lyrics: LyricsBlock | null;
   audioError: string | null;
+  /** Informational, by-design limitation (e.g. official embed, no stream decoding) — not a failure. */
+  audioNote: string | null;
   lyricsError: string | null;
   transcriptionError: string | null;
   warnings: string[];
