@@ -49,10 +49,47 @@ export function FLStudioChannelRack({
   const [selectedPatternMode, setSelectedPatternMode] = useState<string>("auto");
   const [mutedChannels, setMutedChannels] = useState<Record<string, boolean>>({});
   const [soloChannel, setSoloChannel] = useState<string | null>(null);
-  const [bpmMultiplier, setBpmMultiplier] = useState<1 | 0.5 | 2>(1);
+  const [customBpm, setCustomBpm] = useState<number | null>(null);
+  const detectedBpm = bpm && bpm > 40 && bpm < 260 ? bpm : 120;
+  // If detected BPM is half-time trap (60-95 BPM), default to 2x double-time for snappy 16th grid rhythm
+  const [bpmMultiplier, setBpmMultiplier] = useState<number>(detectedBpm < 95 ? 2 : 1);
+  const [phaseNudgeMs, setPhaseNudgeMs] = useState(0);
   const [soundAudioEnabled, setSoundAudioEnabled] = useState(false);
   const [localPlaying, setLocalPlaying] = useState(false);
   const [localStep, setLocalStep] = useState(0);
+
+  // High-precision smooth interpolated audio clock
+  const [smoothTime, setSmoothTime] = useState(currentTime);
+  const lastReportedTimeRef = useRef(currentTime);
+  const lastPerfTimeRef = useRef(performance.now());
+
+  useEffect(() => {
+    lastReportedTimeRef.current = currentTime;
+    lastPerfTimeRef.current = performance.now();
+  }, [currentTime]);
+
+  const isMasterPlaying = isPlaying || localPlaying;
+
+  useEffect(() => {
+    if (!isMasterPlaying) {
+      setSmoothTime(currentTime);
+      return;
+    }
+
+    let animId: number;
+    const tick = () => {
+      const now = performance.now();
+      const elapsedSec = (now - lastPerfTimeRef.current) / 1000;
+      const interpolated = isPlaying
+        ? lastReportedTimeRef.current + elapsedSec
+        : smoothTime;
+      setSmoothTime(interpolated);
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [isMasterPlaying, isPlaying, currentTime]);
 
   // Generate dynamic patterns bank from audio DSP features
   const basePatterns = useMemo(() => {
@@ -83,15 +120,14 @@ export function FLStudioChannelRack({
   const currentChannels = patternBank[effectiveSectionKey] || patternBank["Verse"] || [];
 
   // Effective BPM & Bar Duration
-  const rawBpm = bpm && bpm > 40 && bpm < 260 ? bpm : 120;
-  const effectiveBpm = rawBpm * bpmMultiplier;
+  const activeBaseBpm = customBpm || detectedBpm;
+  const effectiveBpm = activeBaseBpm * bpmMultiplier;
   const barDuration = (60 / effectiveBpm) * 4;
 
-  const isMasterPlaying = isPlaying || localPlaying;
-
-  // Real-time active step calculation
+  // Real-time active step calculation with phase nudge
+  const nudgedTime = Math.max(0, smoothTime + phaseNudgeMs / 1000);
   const activeStep = isPlaying && barDuration > 0
-    ? Math.floor(((currentTime % barDuration) / barDuration) * 16)
+    ? Math.floor(((nudgedTime % barDuration) / barDuration) * 16)
     : localPlaying
     ? localStep
     : 0;
@@ -163,7 +199,7 @@ export function FLStudioChannelRack({
         ? instruments.instruments.some((inst) => inst.id.toLowerCase().includes(ch.family.toLowerCase()) && inst.detected)
         : true;
       if (ch.steps[activeStep] && !isMuted && isStemDetected) {
-        playAuditionSound(ch.id);
+        playAuditionSound(ch.id, ch.stepNotes?.[activeStep]);
       }
     });
   }, [activeStep, isMasterPlaying, soundAudioEnabled, currentChannels, soloChannel, mutedChannels, instruments]);
@@ -174,9 +210,9 @@ export function FLStudioChannelRack({
 
   return (
     <div className="hud-panel rounded-xl border border-cyanx/20 bg-[#0d1017] shadow-2xl overflow-hidden font-mono text-xs select-none">
-      {/* Top Futuristic DAW Header with Play Button & Transport */}
+      {/* Top Futuristic DAW Header with Play Button, Speed Controls & Phase Nudge */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-white/10 bg-[#121622] px-4 py-3">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           {/* Main Integrated Play/Pause Button */}
           <button
             type="button"
@@ -199,25 +235,60 @@ export function FLStudioChannelRack({
             </span>
           </div>
 
-          {/* BPM & Speed Multiplier (0.5x, 1x, 2x) */}
-          <div className="flex items-center gap-1 rounded bg-pit border border-cyanx/40 px-2 py-0.5 text-[10px] font-extrabold text-cyanx shadow-inner">
-            <span>{effectiveBpm.toFixed(1)} BPM</span>
-            <div className="flex items-center gap-0.5 ml-1.5 border-l border-white/20 pl-1.5 text-[9px]">
-              {([0.5, 1, 2] as const).map((mult) => (
+          {/* BPM & Speed Multiplier (0.5x, 1x, 2x RAPID) */}
+          <div className="flex items-center gap-1.5 rounded-lg bg-pit border border-cyanx/40 px-2.5 py-1 text-[10.5px] font-extrabold text-cyanx shadow-inner">
+            <span className="text-amber">{effectiveBpm.toFixed(1)} BPM</span>
+            <div className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1.5 text-[9.5px]">
+              {[
+                { mult: 2, label: "⚡ 2X (FAST)" },
+                { mult: 1, label: "1X" },
+                { mult: 0.5, label: "0.5X" },
+              ].map(({ mult, label }) => (
                 <button
                   key={mult}
                   type="button"
                   onClick={() => setBpmMultiplier(mult)}
-                  className={`px-1 rounded cursor-pointer transition ${
+                  className={`px-1.5 py-0.5 rounded cursor-pointer transition font-bold ${
                     bpmMultiplier === mult
-                      ? "bg-cyanx text-black font-black"
-                      : "text-faint hover:text-ink"
+                      ? "bg-cyanx text-black font-black shadow-xs shadow-cyanx"
+                      : "text-faint hover:text-ink bg-white/5"
                   }`}
                 >
-                  {mult}x
+                  {label}
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Phase Nudge Control */}
+          <div className="flex items-center gap-1 rounded-lg bg-pit border border-white/10 px-2 py-1 text-[9.5px] text-faint">
+            <span className="font-bold text-dim">ALIGN:</span>
+            <button
+              type="button"
+              onClick={() => setPhaseNudgeMs((p) => p - 25)}
+              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
+              title="Nudge step grid back by -25ms"
+            >
+              -25ms
+            </button>
+            <span className="font-mono text-cyanx font-bold min-w-8 text-center">{phaseNudgeMs > 0 ? `+${phaseNudgeMs}` : phaseNudgeMs}ms</span>
+            <button
+              type="button"
+              onClick={() => setPhaseNudgeMs((p) => p + 25)}
+              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
+              title="Nudge step grid forward by +25ms"
+            >
+              +25ms
+            </button>
+            {phaseNudgeMs !== 0 && (
+              <button
+                type="button"
+                onClick={() => setPhaseNudgeMs(0)}
+                className="text-rosex hover:underline cursor-pointer ml-0.5 text-[8.5px]"
+              >
+                Reset
+              </button>
+            )}
           </div>
 
           {/* Section Pattern Switcher */}
