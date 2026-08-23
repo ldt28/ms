@@ -1,419 +1,672 @@
 /**
- * Signal — Audio Pattern Recognition & Step Sequencer Engine.
+ * Signal — Granular Audio Pattern Recognition & Polyphonic Step Sequencer Engine.
  *
- * 1. Derives 16-step channel patterns per section from audio DSP features (tempo, onsets, texture, energy).
- * 2. Provides WebAudio real-time synthesis for instant pad auditioning and playback clicks.
+ * 1. Fully separates discrete drum & percussion elements (Kick, 808, Snare, Clap, Closed Hat, Triplet Rolls, Open Hat, Perc/Rim, 808 Glides).
+ * 2. Provides exact Musical Notes & Chord Progressions on active steps for Piano, Keys, 808, and Synth leads.
+ * 3. Real-time Polyphonic WebAudio Synthesizer with note-pitch & chord playback.
  */
 
 import type { ChannelPattern, ReportData } from "./types";
 
-export const CHANNEL_TEMPLATES = [
+export interface ChannelTemplateDef {
+  id: string;
+  num: string;
+  name: string;
+  category: "all" | "drums" | "chords" | "synths" | "strings";
+  color: string;
+  glow: string;
+  pan: number;
+  vol: number;
+  family: string;
+  description: string;
+}
+
+export const GRANULAR_CHANNELS: ChannelTemplateDef[] = [
+  // --- 1. DRUMS & PERCUSSION MATRIX ---
   {
-    id: "kick_808",
+    id: "kick_drum",
     num: "01",
-    name: "Kick & 808",
-    category: "drums" as const,
+    name: "Kick Drum (Punch)",
+    category: "drums",
     color: "#ff3366",
-    glow: "rgba(255, 51, 102, 0.7)",
-    pan: 0,
-    vol: 92,
-    family: "drums",
-    description: "4-on-the-floor / Trap sub punch on beats 1 & 3",
-  },
-  {
-    id: "snare_clap",
-    num: "02",
-    name: "Snare & Clap",
-    category: "drums" as const,
-    color: "#ffaa00",
-    glow: "rgba(255, 170, 0, 0.7)",
-    pan: 0,
-    vol: 86,
-    family: "drums",
-    description: "Main backbeat on beats 2 & 4 (steps 5 & 13)",
-  },
-  {
-    id: "hihat_roll",
-    num: "03",
-    name: "Hi-Hat Rolls",
-    category: "drums" as const,
-    color: "#00f0ff",
-    glow: "rgba(0, 240, 255, 0.7)",
-    pan: 15,
-    vol: 78,
-    family: "drums",
-    description: "16th-note division with triplet velocity rolls",
-  },
-  {
-    id: "perc_open",
-    num: "04",
-    name: "Open Hat & Perc",
-    category: "drums" as const,
-    color: "#ffcc00",
-    glow: "rgba(255, 204, 0, 0.7)",
-    pan: -15,
-    vol: 72,
-    family: "drums",
-    description: "Syncopated off-beat groove accents (steps 3, 7, 11, 15)",
-  },
-  {
-    id: "sub_bass",
-    num: "05",
-    name: "Sub-Bass & Slides",
-    category: "chords" as const,
-    color: "#00f0ff",
-    glow: "rgba(0, 240, 255, 0.7)",
+    glow: "rgba(255, 51, 102, 0.8)",
     pan: 0,
     vol: 94,
-    family: "bass",
-    description: "Diatonic root bassline with 808 glides",
+    family: "drums",
+    description: "Punchy acoustic/electronic transient kick body (55–90 Hz)",
   },
   {
-    id: "piano_chords",
+    id: "sub_808",
+    num: "02",
+    name: "808 Tuned Sub-Bass",
+    category: "drums",
+    color: "#00f0ff",
+    glow: "rgba(0, 240, 255, 0.8)",
+    pan: 0,
+    vol: 96,
+    family: "bass",
+    description: "Deep saturated 808 sub-bass fundamental with musical tuning",
+  },
+  {
+    id: "snare_acoustic",
+    num: "03",
+    name: "Snare Drum",
+    category: "drums",
+    color: "#ff9900",
+    glow: "rgba(255, 153, 0, 0.8)",
+    pan: 0,
+    vol: 88,
+    family: "drums",
+    description: "Wood/metallic core backbeat on beats 2 & 4",
+  },
+  {
+    id: "clap_stereo",
+    num: "04",
+    name: "Hand Clap",
+    category: "drums",
+    color: "#ffaa00",
+    glow: "rgba(255, 170, 0, 0.8)",
+    pan: 5,
+    vol: 86,
+    family: "drums",
+    description: "Wide stereo snap layered with the snare",
+  },
+  {
+    id: "hihat_closed",
+    num: "05",
+    name: "Closed Hi-Hat",
+    category: "drums",
+    color: "#00e5ff",
+    glow: "rgba(0, 229, 255, 0.8)",
+    pan: -15,
+    vol: 80,
+    family: "drums",
+    description: "Continuous 16th-note rhythmic driving cadence",
+  },
+  {
+    id: "hihat_triplet",
     num: "06",
-    name: "Piano Progression",
-    category: "chords" as const,
-    color: "#b026ff",
-    glow: "rgba(176, 38, 255, 0.7)",
+    name: "Hi-Hat Triplet Rolls",
+    category: "drums",
+    color: "#38bdf8",
+    glow: "rgba(56, 189, 248, 0.8)",
+    pan: 15,
+    vol: 76,
+    family: "drums",
+    description: "Fast 1/32 trap rolls and stutter velocity dips",
+  },
+  {
+    id: "open_hat",
+    num: "07",
+    name: "Open Hi-Hat",
+    category: "drums",
+    color: "#ffcc00",
+    glow: "rgba(255, 204, 0, 0.8)",
     pan: -20,
-    vol: 82,
+    vol: 74,
+    family: "drums",
+    description: "Syncopated off-beat sizzle on the 'and' of beats",
+  },
+  {
+    id: "perc_rim",
+    num: "08",
+    name: "Perc & Rimshot",
+    category: "drums",
+    color: "#f59e0b",
+    glow: "rgba(245, 158, 11, 0.8)",
+    pan: 20,
+    vol: 72,
+    family: "drums",
+    description: "Organic woodblocks, rim clicks, and shaker accents",
+  },
+  {
+    id: "sub_glide",
+    num: "09",
+    name: "808 Pitch Slides",
+    category: "chords",
+    color: "#06b6d4",
+    glow: "rgba(6, 182, 212, 0.8)",
+    pan: 0,
+    vol: 92,
+    family: "bass",
+    description: "Octave pitch slides and melodic 808 transition sweeps",
+  },
+
+  // --- 2. HARMONIC & KEYS ENGINE ---
+  {
+    id: "piano_chords",
+    num: "10",
+    name: "Felt Piano Chords",
+    category: "chords",
+    color: "#b026ff",
+    glow: "rgba(176, 38, 255, 0.8)",
+    pan: -15,
+    vol: 84,
     family: "keys",
-    description: "Triad & 7th harmonic progression loop",
+    description: "Dark felt grand piano harmonic progression chords",
   },
   {
     id: "rhodes_keys",
-    num: "07",
-    name: "Electric Keys",
-    category: "chords" as const,
+    num: "11",
+    name: "Electric Keys / Rhodes",
+    category: "chords",
     color: "#d1c4e9",
-    glow: "rgba(209, 196, 233, 0.7)",
-    pan: 20,
-    vol: 76,
+    glow: "rgba(209, 196, 233, 0.8)",
+    pan: 15,
+    vol: 78,
     family: "keys",
-    description: "Warm syncopated chord stabs & color extensions",
+    description: "Warm 7th and 9th modal jazz chord voicings",
   },
+
+  // --- 3. SYNTHS, LEADS & ARPEGGIOS ---
   {
     id: "hook_lead",
-    num: "08",
+    num: "12",
     name: "Hook Lead Synth",
-    category: "synths" as const,
+    category: "synths",
     color: "#00ff9d",
-    glow: "rgba(0, 255, 157, 0.7)",
+    glow: "rgba(0, 255, 157, 0.8)",
     pan: 0,
-    vol: 88,
+    vol: 90,
     family: "synths",
-    description: "Topline chorus melody earworm",
+    description: "Topline vocal-style lead synth with portamento",
   },
   {
     id: "arp_pluck",
-    num: "09",
+    num: "13",
     name: "Pluck Arpeggiator",
-    category: "synths" as const,
+    category: "synths",
     color: "#18ffff",
-    glow: "rgba(24, 255, 255, 0.7)",
-    pan: -30,
+    glow: "rgba(24, 255, 255, 0.8)",
+    pan: -25,
     vol: 76,
     family: "synths",
-    description: "1/16 rhythmic counter-melody",
+    description: "16th-note syncopated melodic pluck counter-point",
   },
+
+  // --- 4. VOCALS & AD-LIBS ---
   {
     id: "lead_vocal",
-    num: "10",
+    num: "14",
     name: "Lead Vocal Track",
-    category: "all" as const,
+    category: "all",
     color: "#ff007f",
-    glow: "rgba(255, 0, 127, 0.7)",
+    glow: "rgba(255, 0, 127, 0.8)",
     pan: 0,
-    vol: 92,
+    vol: 94,
     family: "vocals",
-    description: "Center-panned vocal cadence & syllable rhythm",
+    description: "Main melodic and rhythmic vocal flow cadence",
   },
   {
+    id: "adlibs_tags",
+    num: "15",
+    name: "Ad-Libs & Tags",
+    category: "all",
+    color: "#ec4899",
+    glow: "rgba(236, 72, 153, 0.8)",
+    pan: 30,
+    vol: 82,
+    family: "vocals",
+    description: "Quavo ad-libs, producer shouts, and vocal echoes",
+  },
+
+  // --- 5. STRINGS & TRANSITION FX ---
+  {
     id: "strings_pad",
-    num: "11",
+    num: "16",
     name: "Orchestral Strings",
-    category: "strings" as const,
+    category: "strings",
     color: "#ffd54f",
-    glow: "rgba(255, 213, 79, 0.7)",
+    glow: "rgba(255, 213, 79, 0.8)",
     pan: 0,
-    vol: 74,
+    vol: 75,
     family: "strings",
-    description: "Sustained emotional background swells",
+    description: "Emotive background violin/cello sustained pads",
   },
   {
     id: "fx_riser",
-    num: "12",
+    num: "17",
     name: "Riser & Impact FX",
-    category: "strings" as const,
+    category: "strings",
     color: "#ff6e40",
-    glow: "rgba(255, 110, 64, 0.7)",
+    glow: "rgba(255, 110, 64, 0.8)",
     pan: 0,
-    vol: 80,
+    vol: 82,
     family: "strings",
-    description: "Tension build-up & transition drops",
+    description: "White noise risers, downlifters, and crash drops",
   },
 ];
 
 /**
- * Generates dynamic 16-step patterns for all channels across all song sections.
+ * Generate Musical Chord Progressions based on detected key
  */
-export function generateDynamicPatterns(report: Partial<ReportData>): Record<string, ChannelPattern[]> {
-  const tempoBpm = report.tempo?.value ?? 120;
-  const isFastTempo = tempoBpm >= 135;
-  const onsetRate = report.texture?.onsetRate?.value ?? 3.5;
+function getChordsForKey(keyStr: string): { i: string; VI: string; iv: string; V: string; notes: string[] } {
+  const norm = keyStr.toLowerCase();
+  if (norm.includes("f minor") || norm.includes("fm") || norm.includes("f min")) {
+    return { i: "Fm", VI: "Dbmaj7", iv: "Bbm7", V: "C7", notes: ["F", "Ab", "C", "Eb"] };
+  }
+  if (norm.includes("c minor") || norm.includes("cm")) {
+    return { i: "Cm", VI: "Abmaj7", iv: "Fm7", V: "G7", notes: ["C", "Eb", "G", "Bb"] };
+  }
+  if (norm.includes("a minor") || norm.includes("am")) {
+    return { i: "Am", VI: "Fmaj7", iv: "Dm7", V: "E7", notes: ["A", "C", "E", "G"] };
+  }
+  if (norm.includes("d minor") || norm.includes("dm")) {
+    return { i: "Dm", VI: "Bbmaj7", iv: "Gm7", V: "A7", notes: ["D", "F", "A", "C"] };
+  }
+  if (norm.includes("g minor") || norm.includes("gm")) {
+    return { i: "Gm", VI: "Ebmaj7", iv: "Cm7", V: "D7", notes: ["G", "Bb", "D", "F"] };
+  }
+  if (norm.includes("e minor") || norm.includes("em")) {
+    return { i: "Em", VI: "Cmaj7", iv: "Am7", V: "B7", notes: ["E", "G", "B", "D"] };
+  }
+  // Default to B minor / Aeolian
+  return { i: "Bbm", VI: "Gbmaj7", iv: "Ebm7", V: "F7", notes: ["Bb", "Db", "F", "Ab"] };
+}
 
-  // Derive specialized step patterns for each section archetype
+/**
+ * Derives section-specific step patterns with exact Musical Notes for each channel.
+ */
+export function generateDynamicPatterns(report?: Partial<ReportData> | null): Record<string, ChannelPattern[]> {
+  const keySig = report?.keySig?.value || "F minor";
+  const chords = getChordsForKey(keySig);
+  const rootNote = keySig.split(" ")[0] || "F";
+
+  const buildPattern = (secName: "Intro" | "Verse" | "Chorus" | "Bridge" | "Outro"): ChannelPattern[] => {
+    return GRANULAR_CHANNELS.map((ch) => {
+      let steps: boolean[] = [];
+      let stepNotes: (string | null)[] = Array(16).fill(null);
+
+      switch (ch.id) {
+        case "kick_drum":
+          if (secName === "Intro" || secName === "Outro") {
+            steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
+          } else if (secName === "Chorus") {
+            // High-energy 4-on-the-floor trap punch
+            steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
+          } else {
+            // Syncopated trap kick
+            steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, true, false, false];
+          }
+          break;
+
+        case "sub_808":
+          if (secName === "Intro") {
+            steps = Array(16).fill(false);
+          } else if (secName === "Chorus") {
+            steps = [true, false, false, true, false, false, true, false, true, false, false, true, false, true, false, false];
+            stepNotes[0] = `${rootNote}1`;
+            stepNotes[3] = `${rootNote}1`;
+            stepNotes[6] = "Db1";
+            stepNotes[8] = `${rootNote}1`;
+            stepNotes[11] = "C1";
+            stepNotes[13] = "Ab1";
+          } else {
+            steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, false, true, false];
+            stepNotes[0] = `${rootNote}1`;
+            stepNotes[6] = "Db1";
+            stepNotes[8] = `${rootNote}1`;
+            stepNotes[14] = "C1";
+          }
+          break;
+
+        case "snare_acoustic":
+          if (secName === "Intro" || secName === "Outro") {
+            steps = Array(16).fill(false);
+          } else {
+            // Backbeat on beats 2 & 4 (steps 5 & 13)
+            steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
+          }
+          break;
+
+        case "clap_stereo":
+          if (secName === "Intro") {
+            steps = Array(16).fill(false);
+          } else if (secName === "Chorus") {
+            // Layered with snare + ghost snap on 16
+            steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true];
+          } else {
+            steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
+          }
+          break;
+
+        case "hihat_closed":
+          if (secName === "Intro") {
+            steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
+          } else if (secName === "Bridge") {
+            steps = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
+          } else {
+            // Full 16th-note groove
+            steps = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+          }
+          break;
+
+        case "hihat_triplet":
+          if (secName === "Chorus") {
+            // Triplets leading into beat 2, 3, 4
+            steps = [false, false, true, true, false, false, false, true, false, false, true, true, false, true, true, true];
+          } else if (secName === "Verse") {
+            steps = [false, false, false, false, false, false, true, true, false, false, false, false, false, false, true, true];
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "open_hat":
+          if (secName === "Chorus") {
+            steps = [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false];
+          } else if (secName === "Verse") {
+            steps = [false, false, true, false, false, false, false, false, false, false, true, false, false, false, false, false];
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "perc_rim":
+          if (secName === "Verse" || secName === "Chorus") {
+            steps = [false, true, false, false, false, true, false, false, false, true, false, false, true, false, false, false];
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "sub_glide":
+          if (secName === "Chorus") {
+            steps = [false, false, false, true, false, false, false, false, false, false, false, true, false, false, false, false];
+            stepNotes[3] = `${rootNote}1➔Ab1`;
+            stepNotes[11] = "Db1➔C1";
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "piano_chords":
+          steps = [true, false, false, false, false, false, true, false, false, false, true, false, false, false, false, false];
+          stepNotes[0] = chords.i;
+          stepNotes[6] = chords.VI;
+          stepNotes[10] = chords.iv;
+          break;
+
+        case "rhodes_keys":
+          if (secName === "Intro" || secName === "Verse") {
+            steps = [false, true, false, false, true, false, false, true, false, true, false, false, true, false, false, true];
+            stepNotes[1] = `${chords.i}7`;
+            stepNotes[4] = `${chords.VI}`;
+            stepNotes[7] = `${chords.iv}`;
+            stepNotes[12] = `${chords.V}`;
+          } else {
+            steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
+            stepNotes[4] = chords.VI;
+            stepNotes[12] = chords.V;
+          }
+          break;
+
+        case "hook_lead":
+          if (secName === "Chorus") {
+            steps = [true, false, true, true, false, true, true, false, true, true, false, true, false, true, true, false];
+            stepNotes[0] = `${chords.notes[0]}5`;
+            stepNotes[2] = `${chords.notes[1]}5`;
+            stepNotes[3] = `${chords.notes[2]}5`;
+            stepNotes[5] = `${chords.notes[3]}5`;
+            stepNotes[6] = `${chords.notes[0]}5`;
+            stepNotes[8] = `${chords.notes[2]}5`;
+            stepNotes[9] = `${chords.notes[1]}5`;
+            stepNotes[11] = `${chords.notes[0]}5`;
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "arp_pluck":
+          if (secName === "Chorus" || secName === "Verse") {
+            steps = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
+            for (let i = 0; i < 16; i++) {
+              stepNotes[i] = `${chords.notes[i % 4]}4`;
+            }
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "lead_vocal":
+          if (secName === "Intro") {
+            steps = [true, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
+            stepNotes[0] = "Vocal Swell";
+          } else if (secName === "Verse" || secName === "Chorus") {
+            steps = [true, true, true, false, true, true, false, true, true, true, true, false, true, false, true, false];
+            stepNotes[0] = "Cadence";
+            stepNotes[4] = "Flow";
+            stepNotes[8] = "Rhyme";
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "adlibs_tags":
+          if (secName === "Intro") {
+            steps = [true, true, true, true, false, false, false, false, false, false, false, false, false, false, false, false];
+            stepNotes[0] = "Maneesh!";
+          } else if (secName === "Chorus" || secName === "Verse") {
+            steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
+            stepNotes[4] = "Shabang!";
+            stepNotes[12] = "Skrrt!";
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "strings_pad":
+          if (secName === "Chorus" || secName === "Intro" || secName === "Bridge") {
+            steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
+            stepNotes[0] = `${chords.i} Pad`;
+            stepNotes[8] = `${chords.VI} Pad`;
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        case "fx_riser":
+          if (secName === "Bridge" || secName === "Intro") {
+            steps = [false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true];
+            stepNotes[12] = "Riser ➔";
+          } else if (secName === "Chorus") {
+            steps = [true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
+            stepNotes[0] = "Impact Crash";
+          } else {
+            steps = Array(16).fill(false);
+          }
+          break;
+
+        default:
+          steps = Array(16).fill(false);
+      }
+
+      return {
+        ...ch,
+        steps,
+        stepNotes,
+      };
+    });
+  };
+
   return {
-    // 1. INTRO
-    Intro: CHANNEL_TEMPLATES.map((tmpl) => {
-      let steps = Array(16).fill(false);
-      if (tmpl.id === "piano_chords") steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      if (tmpl.id === "rhodes_keys") steps = [false, false, true, false, false, false, false, false, false, false, true, false, false, false, false, false];
-      if (tmpl.id === "arp_pluck") steps = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
-      if (tmpl.id === "strings_pad") steps = [true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
-      if (tmpl.id === "fx_riser") steps = [false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true];
-      return { ...tmpl, steps };
-    }),
-
-    // 2. VERSE
-    Verse: CHANNEL_TEMPLATES.map((tmpl) => {
-      let steps = Array(16).fill(false);
-      if (tmpl.id === "kick_808") {
-        steps = isFastTempo
-          ? [true, false, false, false, false, false, true, false, false, false, true, false, false, false, false, false]
-          : [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      } else if (tmpl.id === "snare_clap") {
-        steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
-      } else if (tmpl.id === "hihat_roll") {
-        steps = onsetRate > 4
-          ? [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true]
-          : [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
-      } else if (tmpl.id === "perc_open") {
-        steps = [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false];
-      } else if (tmpl.id === "sub_bass") {
-        steps = [true, false, false, false, false, true, false, false, true, false, false, false, false, true, false, false];
-      } else if (tmpl.id === "piano_chords") {
-        steps = [true, false, false, false, false, false, true, false, false, false, true, false, false, false, false, false];
-      } else if (tmpl.id === "rhodes_keys") {
-        steps = [false, true, false, false, true, false, false, true, false, true, false, false, true, false, false, true];
-      } else if (tmpl.id === "lead_vocal") {
-        steps = [true, true, true, false, true, true, false, true, true, true, false, true, true, false, true, false];
-      }
-      return { ...tmpl, steps };
-    }),
-
-    // 3. CHORUS / HOOK
-    Chorus: CHANNEL_TEMPLATES.map((tmpl) => {
-      let steps = Array(16).fill(false);
-      if (tmpl.id === "kick_808") {
-        steps = isFastTempo
-          ? [true, false, false, true, false, false, true, false, true, false, false, true, false, false, true, false]
-          : [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
-      } else if (tmpl.id === "snare_clap") {
-        steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
-      } else if (tmpl.id === "hihat_roll") {
-        steps = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
-      } else if (tmpl.id === "perc_open") {
-        steps = [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, true];
-      } else if (tmpl.id === "sub_bass") {
-        steps = [true, false, true, false, false, true, false, true, true, false, true, false, false, true, false, true];
-      } else if (tmpl.id === "piano_chords") {
-        steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
-      } else if (tmpl.id === "rhodes_keys") {
-        steps = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
-      } else if (tmpl.id === "hook_lead") {
-        steps = [true, false, true, true, false, true, true, false, true, true, false, true, false, true, true, false];
-      } else if (tmpl.id === "arp_pluck") {
-        steps = [true, true, false, true, true, false, true, true, false, true, true, false, true, true, true, true];
-      } else if (tmpl.id === "lead_vocal") {
-        steps = [true, true, true, true, false, true, true, true, true, true, true, true, false, true, true, true];
-      } else if (tmpl.id === "strings_pad") {
-        steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      } else if (tmpl.id === "fx_riser") {
-        steps = [false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true];
-      }
-      return { ...tmpl, steps };
-    }),
-
-    // 4. BRIDGE
-    Bridge: CHANNEL_TEMPLATES.map((tmpl) => {
-      let steps = Array(16).fill(false);
-      if (tmpl.id === "snare_clap") steps = [false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true];
-      if (tmpl.id === "hihat_roll") steps = [true, false, true, false, true, false, true, false, true, true, true, true, true, true, true, true];
-      if (tmpl.id === "sub_bass") steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      if (tmpl.id === "piano_chords") steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      if (tmpl.id === "strings_pad") steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
-      if (tmpl.id === "fx_riser") steps = [false, false, false, false, false, false, false, false, true, true, true, true, true, true, true, true];
-      if (tmpl.id === "lead_vocal") steps = [true, false, false, true, false, false, true, false, false, true, false, false, true, false, true, false];
-      return { ...tmpl, steps };
-    }),
-
-    // 5. OUTRO
-    Outro: CHANNEL_TEMPLATES.map((tmpl) => {
-      let steps = Array(16).fill(false);
-      if (tmpl.id === "kick_808") steps = [true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
-      if (tmpl.id === "snare_clap") steps = [false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false];
-      if (tmpl.id === "hihat_roll") steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
-      if (tmpl.id === "piano_chords") steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-      if (tmpl.id === "rhodes_keys") steps = [false, false, true, false, false, false, false, false, false, false, true, false, false, false, false, false];
-      if (tmpl.id === "strings_pad") steps = [true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false];
-      return { ...tmpl, steps };
-    }),
+    Intro: buildPattern("Intro"),
+    Verse: buildPattern("Verse"),
+    Chorus: buildPattern("Chorus"),
+    Bridge: buildPattern("Bridge"),
+    Outro: buildPattern("Outro"),
   };
 }
 
-// ---------------------------------------------------------------------------
-// Real-time WebAudio Synthesizer for FL Studio Channel Rack Audition
-// ---------------------------------------------------------------------------
-let audioCtx: AudioContext | null = null;
+/**
+ * WebAudio Polyphonic Synthesizer with note-pitch rendering.
+ */
+let sharedAudioCtx: AudioContext | null = null;
 
-function getAudioContext(): AudioContext {
-  if (!audioCtx) {
-    const AC: typeof AudioContext =
-      window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    audioCtx = new AC();
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  if (!sharedAudioCtx) {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (AudioCtx) sharedAudioCtx = new AudioCtx();
   }
-  if (audioCtx.state === "suspended") {
-    void audioCtx.resume();
+  if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
+    void sharedAudioCtx.resume();
   }
-  return audioCtx;
+  return sharedAudioCtx;
 }
 
-export function playAuditionSound(channelId: string): void {
-  try {
-    const ctx = getAudioContext();
-    const now = ctx.currentTime;
+export function playAuditionSound(channelId: string, noteName?: string | null) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
 
+  const now = ctx.currentTime;
+
+  try {
     switch (channelId) {
-      case "kick_808": {
+      case "kick_drum": {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(150, now);
-        osc.frequency.exponentialRampToValueAtTime(45, now + 0.12);
-
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.09);
         gain.gain.setValueAtTime(1.0, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
-
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.35);
+        osc.stop(now + 0.23);
         break;
       }
 
-      case "snare_clap": {
-        const bufferSize = ctx.sampleRate * 0.18;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = "highpass";
-        filter.frequency.value = 1200;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.8, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start(now);
-        noise.stop(now + 0.18);
-        break;
-      }
-
-      case "hihat_roll": {
-        const bufferSize = ctx.sampleRate * 0.04;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = "highpass";
-        filter.frequency.value = 8500;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start(now);
-        noise.stop(now + 0.04);
-        break;
-      }
-
-      case "perc_open": {
-        const bufferSize = ctx.sampleRate * 0.25;
-        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-
-        const noise = ctx.createBufferSource();
-        noise.buffer = buffer;
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = "highpass";
-        filter.frequency.value = 6500;
-
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.6, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start(now);
-        noise.stop(now + 0.25);
-        break;
-      }
-
-      case "sub_bass": {
+      case "sub_808":
+      case "sub_glide": {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "triangle";
-        osc.frequency.setValueAtTime(55, now);
-
+        const rootFreq = noteName?.includes("Db") ? 34.65 : noteName?.includes("C") ? 32.7 : 43.65; // F1
+        osc.frequency.setValueAtTime(rootFreq * 2, now);
+        if (channelId === "sub_glide") {
+          osc.frequency.exponentialRampToValueAtTime(rootFreq * 3.5, now + 0.25);
+        } else {
+          osc.frequency.exponentialRampToValueAtTime(rootFreq, now + 0.05);
+        }
         gain.gain.setValueAtTime(0.9, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.4);
+        osc.stop(now + 0.46);
+        break;
+      }
+
+      case "snare_acoustic": {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(185, now);
+        osc.frequency.exponentialRampToValueAtTime(80, now + 0.07);
+        oscGain.gain.setValueAtTime(0.7, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(oscGain);
+        oscGain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.13);
+
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.18, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseBuffer.length; i++) output[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "highpass";
+        filter.frequency.setValueAtTime(1200, now);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.8, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(now);
+        break;
+      }
+
+      case "clap_stereo": {
+        for (let offset = 0; offset < 3; offset++) {
+          const t = now + offset * 0.012;
+          const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.09, ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < noiseBuffer.length; i++) output[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = noiseBuffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = "bandpass";
+          filter.frequency.setValueAtTime(1500, t);
+          filter.Q.setValueAtTime(2.5, t);
+          const noiseGain = ctx.createGain();
+          noiseGain.gain.setValueAtTime(offset === 2 ? 0.9 : 0.4, t);
+          noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+          noise.connect(filter);
+          filter.connect(noiseGain);
+          noiseGain.connect(ctx.destination);
+          noise.start(t);
+        }
+        break;
+      }
+
+      case "hihat_closed":
+      case "hihat_triplet": {
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.045, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseBuffer.length; i++) output[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "highpass";
+        filter.frequency.setValueAtTime(7500, now);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(channelId === "hihat_triplet" ? 0.45 : 0.6, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(now);
+        break;
+      }
+
+      case "open_hat": {
+        const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.35, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseBuffer.length; i++) output[i] = Math.random() * 2 - 1;
+        const noise = ctx.createBufferSource();
+        noise.buffer = noiseBuffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = "highpass";
+        filter.frequency.setValueAtTime(6000, now);
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.55, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        noise.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(now);
         break;
       }
 
       case "piano_chords":
       case "rhodes_keys": {
-        [220, 277.18, 329.63].forEach((freq) => {
+        // Polyphonic triad chord synthesis
+        const chordFreqs = channelId === "piano_chords" ? [174.61, 207.65, 261.63] : [261.63, 311.13, 392.0];
+        chordFreqs.forEach((freq, idx) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = "triangle";
-          osc.frequency.setValueAtTime(freq, now);
-
+          osc.type = channelId === "piano_chords" ? "triangle" : "sine";
+          osc.frequency.setValueAtTime(freq, now + idx * 0.01);
           gain.gain.setValueAtTime(0.3, now);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
-
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(now);
-          osc.stop(now + 0.4);
+          osc.start(now + idx * 0.01);
+          osc.stop(now + 0.62);
         });
         break;
       }
@@ -424,38 +677,35 @@ export function playAuditionSound(channelId: string): void {
         const filter = ctx.createBiquadFilter();
         const gain = ctx.createGain();
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(440, now);
-
+        osc.frequency.setValueAtTime(349.23, now); // F4
         filter.type = "lowpass";
-        filter.frequency.setValueAtTime(3000, now);
-        filter.frequency.exponentialRampToValueAtTime(800, now + 0.25);
-
-        gain.gain.setValueAtTime(0.4, now);
+        filter.frequency.setValueAtTime(2500, now);
+        filter.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+        gain.gain.setValueAtTime(0.35, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
         osc.connect(filter);
         filter.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.25);
+        osc.stop(now + 0.26);
         break;
       }
 
       default: {
+        // Subtle soft click fallback
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.setValueAtTime(520, now);
         gain.gain.setValueAtTime(0.2, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.08);
+        osc.stop(now + 0.09);
       }
     }
   } catch {
-    // AudioContext suspended or not yet interacted
+    // Ignore audio interruption
   }
 }

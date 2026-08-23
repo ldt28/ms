@@ -132,6 +132,7 @@ export interface ChannelPattern {
   vol: number;
   family: string;
   steps: boolean[];
+  stepNotes?: (string | null)[];
   description: string;
 }
 
