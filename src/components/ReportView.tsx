@@ -9,6 +9,7 @@ import { InstrumentMatrixPanel } from "./InstrumentMatrixPanel";
 import { ProducerInsightsPanel } from "./ProducerInsightsPanel";
 import { SyncedLyricsRack } from "./SyncedLyricsRack";
 import { FullSongDAWMap } from "./FullSongDAWMap";
+import { FLStudioChannelRack } from "./FLStudioChannelRack";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -275,6 +276,10 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         { label: "Outro", start: Math.round(effectiveDuration * 0.90), end: effectiveDuration, avgEnergy: 0.50, tier: "guessed" as Tier },
       ];
 
+  const activeSection = effectiveSections.find(
+    (s) => currentPlaybackTime >= s.start && currentPlaybackTime < s.end
+  );
+
   // provenance tally
   const tally: Record<Tier, number> = { measured: 0, computed: 0, estimated: 0, guessed: 0 };
   const count = (t: Tier | undefined) => { if (t) tally[t]++; };
@@ -430,6 +435,16 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           duration={effectiveDuration}
           isPlaying={isPlaybackPlaying}
           onSeek={handleSeek}
+        />
+      </Reveal>
+
+      {/* FL Studio Granular Step Sequencer & Pattern Breakdown */}
+      <Reveal delay={75}>
+        <FLStudioChannelRack
+          currentTime={currentPlaybackTime}
+          isPlaying={isPlaybackPlaying}
+          activeSectionName={activeSection?.label || "Verse"}
+          instruments={report.instruments}
         />
       </Reveal>
 
