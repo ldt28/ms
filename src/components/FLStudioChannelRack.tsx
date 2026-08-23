@@ -15,6 +15,7 @@ interface ChannelDef {
   name: string;
   category: "all" | "drums" | "chords" | "synths" | "strings";
   color: string;
+  glow: string;
   pan: number;
   vol: number;
   family: string;
@@ -24,7 +25,7 @@ interface ChannelDef {
 
 const PATTERN_CATEGORIES = [
   { id: "all", label: "🎛️ ALL STEMS" },
-  { id: "drums", label: "🥁 DRUM PATTERNS" },
+  { id: "drums", label: "🥁 DRUMS & 808" },
   { id: "chords", label: "🎹 CHORDS & KEYS" },
   { id: "synths", label: "⚡ SYNTHS & LEADS" },
   { id: "strings", label: "🎻 STRINGS & FX" },
@@ -39,9 +40,10 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "01",
     name: "Kick & 808",
     category: "drums",
-    color: "#ff5555",
+    color: "#ff3366",
+    glow: "rgba(255, 51, 102, 0.7)",
     pan: 0,
-    vol: 90,
+    vol: 92,
     family: "drums",
     steps: [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false],
     description: "4-on-the-floor / Trap punch on beats 1 & 3",
@@ -52,8 +54,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Snare & Clap",
     category: "drums",
     color: "#ffaa00",
+    glow: "rgba(255, 170, 0, 0.7)",
     pan: 0,
-    vol: 85,
+    vol: 86,
     family: "drums",
     steps: [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false],
     description: "Main backbeat on beats 2 & 4",
@@ -63,7 +66,8 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "03",
     name: "Hi-Hat Rolls",
     category: "drums",
-    color: "#00d2be",
+    color: "#00f0ff",
+    glow: "rgba(0, 240, 255, 0.7)",
     pan: 15,
     vol: 78,
     family: "drums",
@@ -76,8 +80,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Open Hat & Perc",
     category: "drums",
     color: "#ffcc00",
+    glow: "rgba(255, 204, 0, 0.7)",
     pan: -15,
-    vol: 70,
+    vol: 72,
     family: "drums",
     steps: [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false],
     description: "Syncopated off-beat groove accents",
@@ -89,9 +94,10 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "05",
     name: "Sub-Bass & Slides",
     category: "chords",
-    color: "#00e5ff",
+    color: "#00f0ff",
+    glow: "rgba(0, 240, 255, 0.7)",
     pan: 0,
-    vol: 92,
+    vol: 94,
     family: "bass",
     steps: [true, false, true, false, false, true, false, true, true, false, true, false, false, true, false, false],
     description: "Diatonic root bassline with 808 glides",
@@ -101,9 +107,10 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "06",
     name: "Piano Progression",
     category: "chords",
-    color: "#b388ff",
+    color: "#b026ff",
+    glow: "rgba(176, 38, 255, 0.7)",
     pan: -20,
-    vol: 80,
+    vol: 82,
     family: "keys",
     steps: [true, false, false, false, false, false, true, false, false, false, true, false, false, false, false, false],
     description: "Triad / 7th harmonic progression loop",
@@ -114,8 +121,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Electric Keys",
     category: "chords",
     color: "#d1c4e9",
+    glow: "rgba(209, 196, 233, 0.7)",
     pan: 20,
-    vol: 75,
+    vol: 76,
     family: "keys",
     steps: [false, true, false, false, true, false, false, true, false, true, false, false, true, false, false, true],
     description: "Warm syncopated chord stabs",
@@ -127,9 +135,10 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "08",
     name: "Hook Lead Synth",
     category: "synths",
-    color: "#00ff88",
+    color: "#00ff9d",
+    glow: "rgba(0, 255, 157, 0.7)",
     pan: 0,
-    vol: 86,
+    vol: 88,
     family: "synths",
     steps: [true, false, true, true, false, true, true, false, true, true, false, true, false, true, true, false],
     description: "Topline chorus melody earworm",
@@ -140,8 +149,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Pluck Arpeggiator",
     category: "synths",
     color: "#18ffff",
+    glow: "rgba(24, 255, 255, 0.7)",
     pan: -30,
-    vol: 74,
+    vol: 76,
     family: "synths",
     steps: [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
     description: "1/16 rhythmic counter-melody",
@@ -153,9 +163,10 @@ const MASTER_CHANNELS: ChannelDef[] = [
     num: "10",
     name: "Lead Vocal Track",
     category: "all",
-    color: "#ff4081",
+    color: "#ff007f",
+    glow: "rgba(255, 0, 127, 0.7)",
     pan: 0,
-    vol: 90,
+    vol: 92,
     family: "vocals",
     steps: [true, true, true, false, true, true, false, true, true, true, true, false, true, false, true, false],
     description: "Center-panned vocal cadence & singing",
@@ -168,8 +179,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Orchestral Strings",
     category: "strings",
     color: "#ffd54f",
+    glow: "rgba(255, 213, 79, 0.7)",
     pan: 0,
-    vol: 72,
+    vol: 74,
     family: "strings",
     steps: [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false],
     description: "Sustained emotional background swells",
@@ -180,8 +192,9 @@ const MASTER_CHANNELS: ChannelDef[] = [
     name: "Riser & Impact FX",
     category: "strings",
     color: "#ff6e40",
+    glow: "rgba(255, 110, 64, 0.7)",
     pan: 0,
-    vol: 78,
+    vol: 80,
     family: "strings",
     steps: [false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true],
     description: "Tension build-up before the chorus drop",
@@ -214,31 +227,31 @@ export function FLStudioChannelRack({
   );
 
   return (
-    <div className="rounded-xl border border-line bg-[#16191e] shadow-2xl overflow-hidden font-mono text-xs select-none">
-      {/* Top FL Studio DAW Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#282d37] bg-[#1d2128] px-3.5 py-2">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#ff7b00] shadow-sm shadow-[#ff7b00]" />
-            <span className="font-display text-[11px] font-bold tracking-wider text-ink">
-              FL STUDIO · GRANULAR PATTERN SEQUENCER
+    <div className="hud-panel rounded-xl border border-cyanx/20 bg-[#0d1017] shadow-2xl overflow-hidden font-mono text-xs select-none">
+      {/* Top Futuristic DAW Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-white/10 bg-[#121622] px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="h-3 w-3 rounded-full bg-cyanx shadow-md shadow-cyanx animate-pulse" />
+            <span className="font-display text-xs font-black tracking-widest text-ink">
+              STEP.SEQUENCER // RACK MATRIX
             </span>
           </div>
-          <span className="rounded bg-[#282d37] px-1.5 py-0.5 text-[9.5px] font-bold text-amber">
-            PAT 1 · {activeSectionName.toUpperCase()}
+          <span className="rounded bg-pit border border-white/10 px-2 py-0.5 text-[10px] font-extrabold text-amber shadow-inner">
+            PAT 01 · {activeSectionName.toUpperCase()}
           </span>
         </div>
 
         {/* Pattern Category Filters */}
-        <div className="flex items-center gap-1 overflow-x-auto pb-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {PATTERN_CATEGORIES.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setSelectedCategory(cat.id)}
-              className={`rounded px-2 py-1 text-[9.5px] font-bold transition shrink-0 cursor-pointer ${
+              className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition shrink-0 cursor-pointer ${
                 selectedCategory === cat.id
-                  ? "bg-amber text-black shadow-xs shadow-amber"
-                  : "bg-surface/50 border border-linesoft text-dim hover:text-ink"
+                  ? "bg-cyanx text-black shadow-md shadow-cyanx/40 font-black"
+                  : "bg-pit/80 border border-white/10 text-dim hover:text-ink hover:border-cyanx/40"
               }`}
             >
               {cat.label}
@@ -248,7 +261,7 @@ export function FLStudioChannelRack({
       </div>
 
       {/* Channel Pattern Rows */}
-      <div className="divide-y divide-[#222730] p-2 flex flex-col gap-1">
+      <div className="divide-y divide-white/5 p-2.5 flex flex-col gap-1.5 bg-[#080a10]">
         {filteredChannels.map((ch) => {
           const isMuted = !!mutedChannels[ch.id];
           const isStemDetected = instruments?.instruments
@@ -257,34 +270,36 @@ export function FLStudioChannelRack({
 
           const isStepTriggered = ch.steps[activeStep] && isPlaying && !isMuted && isStemDetected;
           const peakLevel = isStepTriggered
-            ? Math.min(100, Math.floor(ch.vol * (0.75 + Math.random() * 0.3)))
+            ? Math.min(100, Math.floor(ch.vol * (0.8 + Math.random() * 0.25)))
             : isPlaying && !isMuted
-            ? Math.floor(Math.random() * 20)
+            ? Math.floor(Math.random() * 25)
             : 0;
 
           return (
             <div
               key={ch.id}
-              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 transition-colors ${
-                isMuted ? "opacity-35 bg-[#121418]" : "bg-[#1a1e24] hover:bg-[#20252d]"
+              className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-all ${
+                isMuted ? "opacity-30 bg-[#0c0e14]" : "bg-[#111520] hover:bg-[#161c2b] border border-white/5"
               }`}
             >
-              {/* Mute/Solo LED */}
+              {/* Sci-Fi Mute/Solo Switch */}
               <button
                 onClick={() => toggleMute(ch.id)}
-                title={isMuted ? "Unmute Pattern" : "Mute Pattern"}
-                className={`h-3.5 w-3.5 rounded-full border border-black/50 transition-all cursor-pointer ${
+                title={isMuted ? "Unmute Channel" : "Mute Channel"}
+                className={`h-4 w-4 rounded-md border transition-all cursor-pointer flex items-center justify-center ${
                   isMuted
-                    ? "bg-dim/30 shadow-none"
-                    : "bg-mint shadow-sm shadow-mint ring-1 ring-mint/40"
+                    ? "border-white/10 bg-pit text-faint"
+                    : "border-mint bg-mint/20 text-mint shadow-xs shadow-mint ring-1 ring-mint/50"
                 }`}
-              />
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${isMuted ? "bg-faint" : "bg-mint"}`} />
+              </button>
 
               {/* Track Number & Name */}
-              <div className="flex items-center gap-1.5 w-32 shrink-0">
-                <span className="text-[10px] text-faint font-bold">{ch.num}</span>
+              <div className="flex items-center gap-2 w-36 shrink-0">
+                <span className="font-mono text-[9px] text-faint font-bold tracking-wider">{ch.num}</span>
                 <span
-                  className="font-bold text-[11px] truncate"
+                  className="font-bold text-[11.5px] truncate drop-shadow"
                   style={{ color: ch.color }}
                   title={ch.description}
                 >
@@ -292,33 +307,33 @@ export function FLStudioChannelRack({
                 </span>
               </div>
 
-              {/* Live LED Peak Meter */}
-              <div className="w-14 shrink-0 flex items-center gap-0.5 px-1 bg-pit rounded py-1 border border-[#2b303c]">
-                {[...Array(8)].map((_, segIdx) => {
-                  const segThreshold = (segIdx / 8) * 100;
+              {/* Calibrated 10-Segment LED Meter */}
+              <div className="w-16 shrink-0 flex items-center gap-0.5 px-1 bg-[#05070a] rounded py-1 border border-white/10 shadow-inner">
+                {[...Array(10)].map((_, segIdx) => {
+                  const segThreshold = (segIdx / 10) * 100;
                   const isLit = peakLevel > segThreshold;
-                  const isRed = segIdx >= 6;
-                  const isYellow = segIdx >= 4 && segIdx < 6;
+                  const isRed = segIdx >= 8;
+                  const isYellow = segIdx >= 5 && segIdx < 8;
 
                   return (
                     <div
                       key={segIdx}
-                      className={`h-2 flex-1 rounded-[1px] transition-all duration-75 ${
+                      className={`h-2.5 flex-1 rounded-[1px] transition-all duration-75 ${
                         isLit
                           ? isRed
-                            ? "bg-[#ff3333] shadow-xs shadow-[#ff3333]"
+                            ? "bg-[#ff0055] shadow-xs shadow-[#ff0055]"
                             : isYellow
-                            ? "bg-[#ffcc00] shadow-xs shadow-[#ffcc00]"
-                            : "bg-[#00ff88] shadow-xs shadow-[#00ff88]"
-                          : "bg-[#252a33]"
+                            ? "bg-[#ffaa00] shadow-xs shadow-[#ffaa00]"
+                            : "bg-[#00ff9d] shadow-xs shadow-[#00ff9d]"
+                          : "bg-[#181e2b]"
                       }`}
                     />
                   );
                 })}
               </div>
 
-              {/* 16-Step Beat Trigger Grid */}
-              <div className="flex-1 grid grid-cols-16 gap-1 min-w-[140px]">
+              {/* 16-Step Illuminated Touch Trigger Pads */}
+              <div className="flex-1 grid grid-cols-16 gap-1 min-w-[150px]">
                 {ch.steps.map((isActiveStep, sIdx) => {
                   const isBeatQuarter = sIdx % 4 === 0;
                   const isCurrentlyPlayingThisStep = activeStep === sIdx && isPlaying;
@@ -326,16 +341,23 @@ export function FLStudioChannelRack({
                   return (
                     <div
                       key={sIdx}
-                      className={`h-4 rounded-[2px] border transition-all ${
-                        isCurrentlyPlayingThisStep ? "ring-2 ring-white scale-105 z-10" : ""
+                      style={
+                        isActiveStep && isCurrentlyPlayingThisStep
+                          ? { boxShadow: `0 0 14px 2px ${ch.color}` }
+                          : undefined
+                      }
+                      className={`h-5 rounded-[2px] border transition-all duration-75 ${
+                        isCurrentlyPlayingThisStep
+                          ? "ring-2 ring-white scale-110 z-10"
+                          : ""
                       } ${
                         isActiveStep
                           ? isBeatQuarter
-                            ? "bg-[#ff5555] border-[#ff7777] shadow-xs shadow-[#ff5555]/30"
-                            : "bg-[#777777] border-[#888888]"
+                            ? "bg-[#ff3366] border-[#ff6688] shadow-sm shadow-[#ff3366]/40"
+                            : "bg-[#8899aa] border-[#aabbcc]"
                           : isBeatQuarter
-                          ? "bg-[#2c323d] border-[#383f4d]"
-                          : "bg-[#1d2128] border-[#252a33]"
+                          ? "bg-[#1c2230] border-white/10"
+                          : "bg-[#10141d] border-white/5"
                       }`}
                     />
                   );
@@ -346,10 +368,15 @@ export function FLStudioChannelRack({
         })}
       </div>
 
-      {/* Footer Notes */}
-      <div className="border-t border-[#282d37] bg-[#12151a] px-3.5 py-1.5 flex items-center justify-between text-[10px] text-faint">
-        <span>16-Step Pattern Grid · Active Stem Breakdown</span>
-        <span className="text-mint">● Synchronized with Master Song Map</span>
+      {/* Footer Status Readout */}
+      <div className="border-t border-white/10 bg-[#0a0c12] px-4 py-2 flex items-center justify-between text-[10px] text-faint">
+        <span className="flex items-center gap-2">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyanx" />
+          <span>16-STEP POLYSYNTH & STEM TRIGGER ENGINE</span>
+        </span>
+        <span className="text-cyanx font-bold">
+          [DSP SYNC ACTIVE · 96kHz 32-BIT FLOAT]
+        </span>
       </div>
     </div>
   );

@@ -224,27 +224,32 @@ export function ConsolePanel(props: {
   const badge = linkInfo ? KIND_BADGE[linkInfo.kind] ?? KIND_BADGE.unsupported : null;
 
   return (
-    <div className="panel ticks flex flex-col gap-5 px-5 py-5 sm:px-6">
-      <div className="flex flex-wrap items-end justify-between gap-2">
+    <div className="hud-panel ticks flex flex-col gap-5 px-5 py-5 sm:px-6 border border-cyanx/20 shadow-2xl">
+      <div className="flex flex-wrap items-end justify-between gap-2 border-b border-white/10 pb-3">
         <div>
-          <div className="kicker">Input console</div>
-          <h2 className="font-display text-xl text-ink">Feed the analyzer</h2>
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-cyanx animate-pulse shadow-sm shadow-cyanx" />
+            <span className="kicker text-cyanx tracking-[0.25em]">INGEST.CONSOLE // MULTI-SOURCE</span>
+          </div>
+          <h2 className="font-display text-xl text-ink font-black drop-shadow flex items-center gap-2">
+            <span>Feed the Analyzer</span>
+          </h2>
         </div>
       </div>
 
       {/* 1-Click Demo & Billboard Charts Bar */}
-      <div className="rounded-xl border border-cyanx/30 bg-cyanx/8 p-3.5 shadow-sm">
+      <div className="rounded-xl border border-cyanx/40 bg-gradient-to-r from-cyanx/10 via-pit to-cyanx/5 p-3.5 shadow-md">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-          <span className="font-mono text-[10.5px] font-bold tracking-wider text-cyanx uppercase flex items-center gap-1.5">
+          <span className="font-mono text-[11px] font-black tracking-wider text-cyanx uppercase flex items-center gap-1.5 drop-shadow">
             <span>⚡</span>
-            <span>1-Click Audio Demos & Charts</span>
+            <span>1-Click Demos & Charts</span>
           </span>
           <button
             onClick={() => setIsChartOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-amber/50 bg-amber/15 px-3 py-1 font-mono text-[10.5px] font-bold text-amber shadow-sm transition hover:bg-amber hover:text-black cursor-pointer"
+            className="flex items-center gap-1.5 rounded-lg border border-amber/60 bg-amber/20 px-3 py-1 font-mono text-[10.5px] font-black text-amber shadow-sm shadow-amber/20 transition hover:bg-amber hover:text-black cursor-pointer"
           >
             <span>📊</span>
-            <span>Billboard Hot 100 Charts</span>
+            <span>Billboard Hot 100</span>
           </button>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -253,15 +258,15 @@ export function ConsolePanel(props: {
               key={p.id}
               onClick={() => handleLoadDemo(p)}
               disabled={loadingDemoId !== null || running}
-              className={`flex items-center gap-2.5 rounded-lg border border-linesoft bg-surface/80 p-2.5 text-left transition hover:border-cyanx hover:bg-surface hover:shadow-sm disabled:opacity-50 cursor-pointer ${
-                title === p.title ? "border-cyanx bg-cyanx/15 shadow-sm shadow-cyanx/10" : ""
+              className={`flex items-center gap-2.5 rounded-lg border border-white/10 bg-pit/80 p-2.5 text-left transition hover:border-cyanx hover:bg-cyanx/10 hover:shadow-md disabled:opacity-50 cursor-pointer ${
+                title === p.title ? "border-cyanx bg-cyanx/20 shadow-md shadow-cyanx/20 ring-1 ring-cyanx" : ""
               }`}
               title={p.description}
             >
               <span className="text-xl">{loadingDemoId === p.id ? "⏳" : p.icon}</span>
               <div className="min-w-0 flex-1">
-                <span className="block truncate font-mono text-xs font-bold text-ink">{p.title}</span>
-                <span className="block truncate font-mono text-[9.5px] text-dim">
+                <span className="block truncate font-mono text-xs font-black text-ink">{p.title}</span>
+                <span className="block truncate font-mono text-[9.5px] text-cyanx font-semibold">
                   {p.genre.split("/")[0]} · {p.bpm} BPM
                 </span>
               </div>
@@ -273,12 +278,12 @@ export function ConsolePanel(props: {
       {/* metadata */}
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="kicker mb-1.5 block">Track title</span>
-          <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Untitled track" maxLength={80} />
+          <span className="kicker mb-1.5 block text-cyanx/80">Track title</span>
+          <input className="input border-white/10 focus:border-cyanx focus:shadow-cyanx/20" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Untitled track" maxLength={80} />
         </label>
         <label className="block">
-          <span className="kicker mb-1.5 block">Artist</span>
-          <input className="input" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Unknown artist" maxLength={80} />
+          <span className="kicker mb-1.5 block text-cyanx/80">Artist</span>
+          <input className="input border-white/10 focus:border-cyanx focus:shadow-cyanx/20" value={artist} onChange={(e) => setArtist(e.target.value)} placeholder="Unknown artist" maxLength={80} />
         </label>
       </div>
 

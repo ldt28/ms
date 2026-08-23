@@ -1,7 +1,6 @@
 import React, { useRef, useState } from "react";
-import type { InstrumentBreakdown, ReportData, Section } from "../lib/types";
+import type { ReportData, Section } from "../lib/types";
 import { formatTime } from "../lib/types";
-import { labelColor } from "./Timeline";
 
 interface FullSongDAWMapProps {
   report: ReportData;
@@ -17,6 +16,7 @@ interface TrackLaneDef {
   name: string;
   icon: string;
   color: string;
+  glowColor: string;
   bgGrad: string;
   activeSections: (sectionLabel: string) => boolean;
   patternName: (sectionLabel: string) => string;
@@ -25,63 +25,69 @@ interface TrackLaneDef {
 const DAW_LANES: TrackLaneDef[] = [
   {
     id: "drums",
-    num: "TRK 01",
+    num: "01",
     name: "Drums & 808",
     icon: "🥁",
-    color: "#ff5555",
-    bgGrad: "from-[#ff5555]/30 to-[#ff5555]/10",
+    color: "#ff3366",
+    glowColor: "rgba(255, 51, 102, 0.6)",
+    bgGrad: "from-[#ff3366]/35 via-[#ff3366]/20 to-[#ff3366]/5",
     activeSections: (label) => !/intro|bridge|outro/i.test(label) || /drop|chorus|hook/i.test(label),
-    patternName: (label) => (/chorus|hook/i.test(label) ? "Full 808 & Kick Drop" : "Main Trap / Drum Beat"),
+    patternName: (label) => (/chorus|hook/i.test(label) ? "HEAVY 808 & TRAP DROP" : "DRUM BEAT PATTERN 1"),
   },
   {
     id: "bass",
-    num: "TRK 02",
+    num: "02",
     name: "Sub-Bass & 808",
     icon: "🎸",
-    color: "#00e5ff",
-    bgGrad: "from-[#00e5ff]/30 to-[#00e5ff]/10",
+    color: "#00f0ff",
+    glowColor: "rgba(0, 240, 255, 0.6)",
+    bgGrad: "from-[#00f0ff]/35 via-[#00f0ff]/20 to-[#00f0ff]/5",
     activeSections: (label) => !/intro/i.test(label),
-    patternName: (label) => (/chorus|hook/i.test(label) ? "Heavy Sub & Slide 808" : "Verse Bassline Groove"),
+    patternName: (label) => (/chorus|hook/i.test(label) ? "SUB GLIDE & 808 SLIDES" : "VERSE BASSLINE GROOVE"),
   },
   {
     id: "keys",
-    num: "TRK 03",
+    num: "03",
     name: "Keys & Chords",
     icon: "🎹",
-    color: "#b388ff",
-    bgGrad: "from-[#b388ff]/30 to-[#b388ff]/10",
+    color: "#b026ff",
+    glowColor: "rgba(176, 38, 255, 0.6)",
+    bgGrad: "from-[#b026ff]/35 via-[#b026ff]/20 to-[#b026ff]/5",
     activeSections: () => true,
-    patternName: (label) => (/verse/i.test(label) ? "Piano Arp & Pad" : "Full Harmonic Chords"),
+    patternName: (label) => (/verse/i.test(label) ? "PIANO ARPEGGIO & VOICINGS" : "FULL 7TH CHORD PROGRESSION"),
   },
   {
     id: "synths",
-    num: "TRK 04",
+    num: "04",
     name: "Synths & Leads",
-    icon: "🎛️",
-    color: "#00d2be",
-    bgGrad: "from-[#00d2be]/30 to-[#00d2be]/10",
+    icon: "⚡",
+    color: "#00ff9d",
+    glowColor: "rgba(0, 255, 157, 0.6)",
+    bgGrad: "from-[#00ff9d]/35 via-[#00ff9d]/20 to-[#00ff9d]/5",
     activeSections: (label) => /chorus|hook|drop|outro/i.test(label),
-    patternName: (label) => (/chorus|hook/i.test(label) ? "Main Hook Lead Synth" : "Pluck & Counter Melody"),
+    patternName: (label) => (/chorus|hook/i.test(label) ? "MAIN TOPLINE LEAD SYNTH" : "1/16 PLUCK COUNTER-MELODY"),
   },
   {
     id: "vocals",
-    num: "TRK 05",
+    num: "05",
     name: "Lead Vocals",
     icon: "🎙️",
-    color: "#ff4081",
-    bgGrad: "from-[#ff4081]/30 to-[#ff4081]/10",
+    color: "#ff007f",
+    glowColor: "rgba(255, 0, 127, 0.6)",
+    bgGrad: "from-[#ff007f]/35 via-[#ff007f]/20 to-[#ff007f]/5",
     activeSections: (label) => !/intro|outro/i.test(label),
-    patternName: (label) => (/chorus|hook/i.test(label) ? "Hook / Main Stanza" : "Verse Vocal Cadence"),
+    patternName: (label) => (/chorus|hook/i.test(label) ? "MAIN HOOK VOCAL STACK" : "VERSE VOCAL CADENCE"),
   },
   {
     id: "fx",
-    num: "TRK 06",
+    num: "06",
     name: "Strings & FX",
     icon: "🎻",
-    color: "#ffb300",
-    bgGrad: "from-[#ffb300]/30 to-[#ffb300]/10",
+    color: "#ffaa00",
+    glowColor: "rgba(255, 170, 0, 0.6)",
+    bgGrad: "from-[#ffaa00]/35 via-[#ffaa00]/20 to-[#ffaa00]/5",
     activeSections: (label) => /intro|pre|bridge|outro/i.test(label),
-    patternName: (label) => (/pre|build/i.test(label) ? "Riser & Sweep FX" : "Ambient String Pad"),
+    patternName: (label) => (/pre|build/i.test(label) ? "TENSION RISER & SWEEP" : "ORCHESTRAL STRING SWELL"),
   },
 ];
 
@@ -126,53 +132,74 @@ export function FullSongDAWMap({
   };
 
   return (
-    <div className="panel ticks relative overflow-hidden p-4 sm:p-6 flex flex-col gap-4 select-none">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-linesoft pb-3">
-        <div>
-          <div className="kicker text-cyanx">FL Studio Playlist · Full Song Arrangement Map</div>
-          <h2 className="font-display text-lg sm:text-xl font-bold text-ink flex items-center gap-2">
-            <span>Multi-Track Stem & Section Arrangement</span>
-            <span className="rounded-full bg-surface border border-line px-2.5 py-0.5 font-mono text-xs text-dim">
-              0:00 – {formatTime(safeDuration)}
-            </span>
-          </h2>
+    <div className="hud-panel relative overflow-hidden p-4 sm:p-6 flex flex-col gap-4 select-none border border-cyanx/20 shadow-2xl">
+      {/* Sci-Fi HUD Top Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3.5">
+        <div className="flex items-center gap-3">
+          <span className="flex h-7 w-7 items-center justify-center rounded-md border border-cyanx/50 bg-cyanx/10 text-cyanx shadow-xs">
+            🎛️
+          </span>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="kicker text-cyanx tracking-[0.25em]">ARRANGE.MATRIX // STEM ROUTING</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-cyanx animate-pulse" />
+            </div>
+            <h2 className="font-display text-lg sm:text-xl font-bold text-ink flex items-center gap-2.5">
+              <span>Full-Song Multi-Track DAW Matrix</span>
+              <span className="rounded-full bg-pit border border-white/10 px-2.5 py-0.5 font-mono text-[11px] text-cyanx font-bold shadow-inner">
+                0:00 – {formatTime(safeDuration)}
+              </span>
+            </h2>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 font-mono text-xs">
-          <div className="flex items-center gap-1.5 rounded-lg border border-linesoft bg-pit px-3 py-1.5 text-dim">
-            <span className="h-2 w-2 rounded-full bg-mint animate-pulse" />
-            <span>PLAYHEAD: {formatTime(currentTime)}</span>
+          <div className="flex items-center gap-2 rounded-lg border border-amber/40 bg-pit/90 px-3 py-1.5 text-amber shadow-sm shadow-amber/10">
+            <span className="h-2 w-2 rounded-full bg-amber animate-ping" />
+            <span className="font-bold tracking-wider">POS: {formatTime(currentTime)}</span>
           </div>
-          <span className="text-[10px] text-faint hidden md:inline">Click timeline anywhere to seek</span>
+          <span className="text-[10px] text-faint hidden md:inline font-mono">
+            [CLICK ANY BAR TO SEEK]
+          </span>
         </div>
       </div>
 
-      {/* Main DAW Multi-Track Arrangement View */}
-      <div className="flex rounded-xl border border-[#262c37] bg-[#12151b] shadow-2xl overflow-hidden">
+      {/* Main Futuristic DAW Arrangement Matrix */}
+      <div className="flex rounded-xl border border-white/10 bg-[#090c12] shadow-2xl overflow-hidden relative">
         {/* Left Track Headers Column */}
-        <div className="w-36 sm:w-44 shrink-0 border-r border-[#262c37] bg-[#171b22] flex flex-col">
+        <div className="w-36 sm:w-48 shrink-0 border-r border-white/10 bg-[#0e121a] flex flex-col">
           {/* Top ruler placeholder */}
-          <div className="h-9 border-b border-[#262c37] px-3 flex items-center font-mono text-[10px] font-bold text-faint tracking-wider">
-            TRACK / STEM
+          <div className="h-10 border-b border-white/10 px-3 flex items-center justify-between font-mono text-[10px] font-bold text-faint tracking-widest bg-[#131722]">
+            <span>STEM / CH</span>
+            <span className="text-[9px] text-cyanx/70">ROUTING</span>
           </div>
 
           {/* Lane Labels */}
           {DAW_LANES.map((lane) => (
             <div
               key={lane.id}
-              className="h-11 border-b border-[#222731] px-2.5 sm:px-3 flex items-center justify-between transition-colors hover:bg-[#1f242d]"
+              className="h-12 border-b border-white/5 px-3 flex items-center justify-between transition-all hover:bg-white/[0.03] group"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm">{lane.icon}</span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-sm drop-shadow">{lane.icon}</span>
                 <div className="min-w-0">
-                  <div className="font-mono text-[9px] text-faint font-semibold">{lane.num}</div>
-                  <div className="font-mono text-[11px] font-bold truncate text-ink">
+                  <div className="font-mono text-[9px] text-faint font-bold tracking-wider">
+                    CH {lane.num}
+                  </div>
+                  <div
+                    className="font-mono text-xs font-bold truncate transition-colors"
+                    style={{ color: lane.color }}
+                  >
                     {lane.name}
                   </div>
                 </div>
               </div>
-              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: lane.color }} />
+
+              {/* Glowing LED status dot */}
+              <span
+                className="h-2 w-2 rounded-full shrink-0 shadow-sm"
+                style={{ background: lane.color, boxShadow: `0 0 8px ${lane.color}` }}
+              />
             </div>
           ))}
         </div>
@@ -183,10 +210,10 @@ export function FullSongDAWMap({
           onClick={handleTimelineClick}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverTime(null)}
-          className="relative flex-1 overflow-x-hidden flex flex-col cursor-crosshair"
+          className="relative flex-1 overflow-x-hidden flex flex-col cursor-crosshair bg-[#06080d]"
         >
           {/* 1. Top Section & Time Ruler */}
-          <div className="relative h-9 border-b border-[#262c37] bg-[#1a1f27] flex items-center">
+          <div className="relative h-10 border-b border-white/10 bg-[#10141d] flex items-center">
             {sections.map((sec, idx) => {
               const startPct = (sec.start / safeDuration) * 100;
               const widthPct = ((sec.end - sec.start) / safeDuration) * 100;
@@ -196,12 +223,19 @@ export function FullSongDAWMap({
                 <div
                   key={idx}
                   style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-                  className={`absolute inset-y-0 border-r border-[#2b3340] px-2 flex items-center justify-between text-[10px] font-mono font-bold transition-colors ${
-                    isCurrentSection ? "bg-amber/20 text-amber" : "text-dim hover:text-ink"
+                  className={`absolute inset-y-0 border-r border-white/10 px-2.5 flex items-center justify-between text-[10px] font-mono font-bold transition-all ${
+                    isCurrentSection
+                      ? "bg-amber/25 text-amber shadow-inner border-t-2 border-t-amber"
+                      : "text-dim hover:text-ink hover:bg-white/[0.02]"
                   }`}
                 >
-                  <span className="truncate uppercase">[{sec.label}]</span>
-                  <span className="text-[8.5px] text-faint hidden sm:inline">{formatTime(sec.start)}</span>
+                  <span className="truncate uppercase tracking-wider font-extrabold flex items-center gap-1">
+                    {isCurrentSection && <span className="h-1.5 w-1.5 rounded-full bg-amber animate-ping" />}
+                    [{sec.label}]
+                  </span>
+                  <span className="text-[9px] text-faint hidden lg:inline font-normal">
+                    {formatTime(sec.start)}
+                  </span>
                 </div>
               );
             })}
@@ -211,10 +245,10 @@ export function FullSongDAWMap({
           {DAW_LANES.map((lane) => (
             <div
               key={lane.id}
-              className="relative h-11 border-b border-[#222731] bg-[#12151b] flex items-center overflow-hidden"
+              className="relative h-12 border-b border-white/5 bg-[#070a0f] flex items-center overflow-hidden"
             >
-              {/* Subtle background measure beat grid */}
-              <div className="absolute inset-0 grid grid-cols-12 pointer-events-none opacity-10 divide-x divide-white" />
+              {/* Subtle background beat grid */}
+              <div className="absolute inset-0 grid grid-cols-16 pointer-events-none opacity-15 divide-x divide-white/20" />
 
               {/* Section Pattern Blocks */}
               {sections.map((sec, sIdx) => {
@@ -227,9 +261,9 @@ export function FullSongDAWMap({
                     <div
                       key={sIdx}
                       style={{ left: `${startPct}%`, width: `${widthPct}%` }}
-                      className="absolute inset-y-1 rounded border border-dashed border-[#262c37]/50 bg-transparent flex items-center justify-center pointer-events-none"
+                      className="absolute inset-y-1.5 rounded border border-dashed border-white/10 bg-black/20 flex items-center justify-center pointer-events-none"
                     >
-                      <span className="font-mono text-[8.5px] text-faint/30">MUTE</span>
+                      <span className="font-mono text-[8.5px] text-faint/40 tracking-widest">MUTE</span>
                     </div>
                   );
                 }
@@ -240,20 +274,23 @@ export function FullSongDAWMap({
                     style={{
                       left: `calc(${startPct}% + 2px)`,
                       width: `calc(${widthPct}% - 4px)`,
-                      borderColor: `${lane.color}70`,
+                      borderColor: lane.color,
+                      boxShadow: `0 0 12px -2px ${lane.glowColor}`,
                     }}
-                    className={`absolute inset-y-1 rounded-md border bg-gradient-to-r ${lane.bgGrad} px-2 flex items-center justify-between overflow-hidden shadow-xs transition-all`}
+                    className={`absolute inset-y-1.5 rounded-lg border bg-gradient-to-r ${lane.bgGrad} px-2.5 flex items-center justify-between overflow-hidden shadow-lg transition-all backdrop-blur-xs`}
                   >
-                    {/* Simulated mini waveform or sequencer blocks */}
-                    <div className="flex items-center gap-0.5 opacity-60 pointer-events-none">
+                    {/* Simulated laser step velocity lines */}
+                    <div className="flex items-end gap-0.5 opacity-80 pointer-events-none h-4">
+                      <span className="h-2 w-1 rounded-xs" style={{ background: lane.color }} />
+                      <span className="h-4 w-1 rounded-xs" style={{ background: lane.color }} />
                       <span className="h-3 w-1 rounded-xs" style={{ background: lane.color }} />
                       <span className="h-5 w-1 rounded-xs" style={{ background: lane.color }} />
-                      <span className="h-2 w-1 rounded-xs" style={{ background: lane.color }} />
+                      <span className="h-3 w-1 rounded-xs" style={{ background: lane.color }} />
                       <span className="h-4 w-1 rounded-xs" style={{ background: lane.color }} />
                     </div>
 
                     <span
-                      className="font-mono text-[9.5px] font-bold truncate ml-1.5"
+                      className="font-mono text-[10px] font-extrabold truncate ml-2 tracking-wide drop-shadow"
                       style={{ color: lane.color }}
                     >
                       {lane.patternName(sec.label)}
@@ -264,12 +301,15 @@ export function FullSongDAWMap({
             </div>
           ))}
 
-          {/* 3. Sweeping Playhead Line */}
+          {/* 3. Sweeping Laser Playhead Line */}
           <div
-            style={{ left: `${currentPlayPct}%` }}
-            className="absolute inset-y-0 w-[2px] bg-amber shadow-lg shadow-amber/60 z-20 pointer-events-none transition-all duration-75"
+            style={{
+              left: `${currentPlayPct}%`,
+              boxShadow: "0 0 16px 2px #ffaa00, 0 0 30px 4px rgba(255, 170, 0, 0.4)",
+            }}
+            className="absolute inset-y-0 w-[2px] bg-amber shadow-2xl z-30 pointer-events-none transition-all duration-75"
           >
-            <div className="absolute top-0 -left-6 bg-amber text-black font-mono text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm">
+            <div className="absolute top-0 -left-6 bg-amber text-black font-mono text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg tracking-wider">
               {formatTime(currentTime)}
             </div>
           </div>
@@ -277,10 +317,13 @@ export function FullSongDAWMap({
           {/* 4. Mouse Hover Timestamp Indicator */}
           {hoverTime !== null && (
             <div
-              style={{ left: `${(hoverTime / safeDuration) * 100}%` }}
-              className="absolute inset-y-0 w-[1px] bg-cyanx/70 z-10 pointer-events-none"
+              style={{
+                left: `${(hoverTime / safeDuration) * 100}%`,
+                boxShadow: "0 0 10px 1px #00f0ff",
+              }}
+              className="absolute inset-y-0 w-[1px] bg-cyanx/80 z-20 pointer-events-none"
             >
-              <div className="absolute bottom-1 -left-5 bg-pit border border-cyanx text-cyanx font-mono text-[9px] px-1 py-0.5 rounded">
+              <div className="absolute bottom-1.5 -left-6 bg-pit border border-cyanx text-cyanx font-mono text-[9.5px] font-bold px-1.5 py-0.5 rounded shadow-lg">
                 {formatTime(hoverTime)}
               </div>
             </div>
@@ -289,28 +332,29 @@ export function FullSongDAWMap({
       </div>
 
       {/* Footer Breakdown Legend */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-linesoft pt-2 font-mono text-xs text-dim">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3 font-mono text-xs text-dim">
+        <div className="flex items-center gap-4">
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#ff5555]" />
-            <span className="text-[11px]">Rhythm Stems</span>
+            <span className="h-2.5 w-2.5 rounded-xs bg-[#ff3366] shadow-xs shadow-[#ff3366]" />
+            <span className="text-[11px] font-bold">Rhythm & 808</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#00e5ff]" />
-            <span className="text-[11px]">Bass / 808</span>
+            <span className="h-2.5 w-2.5 rounded-xs bg-[#00f0ff] shadow-xs shadow-[#00f0ff]" />
+            <span className="text-[11px] font-bold">Sub & Glides</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#b388ff]" />
-            <span className="text-[11px]">Chords & Keys</span>
+            <span className="h-2.5 w-2.5 rounded-xs bg-[#b026ff] shadow-xs shadow-[#b026ff]" />
+            <span className="text-[11px] font-bold">Keys & Chords</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-[#ff4081]" />
-            <span className="text-[11px]">Vocal Tracks</span>
+            <span className="h-2.5 w-2.5 rounded-xs bg-[#ff007f] shadow-xs shadow-[#ff007f]" />
+            <span className="text-[11px] font-bold">Vocal Stacks</span>
           </span>
         </div>
 
-        <span className="text-mint font-bold text-[11px]">
-          ● 60 FPS Real-Time Playhead Tracking
+        <span className="text-mint font-bold text-[11px] flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-mint animate-ping" />
+          <span>60 FPS HARDWARE ACCELERATED PLAYHEAD</span>
         </span>
       </div>
     </div>
