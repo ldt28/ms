@@ -464,39 +464,9 @@ export default function App() {
             }}
           />
         ) : (
-          <div className="grid items-start gap-5 lg:grid-cols-[400px_minmax(0,1fr)]">
-            <div className="lg:sticky lg:top-6">
-              <ConsolePanel
-                title={title}
-                setTitle={setTitle}
-                artist={artist}
-                setArtist={setArtist}
-                file={file}
-                setFile={setFileExclusive}
-                lyrics={lyrics}
-                setLyrics={setLyrics}
-                transcribe={transcribe}
-                setTranscribe={setTranscribe}
-                engine={engine}
-                setEngine={setEngine}
-                endpoint={endpoint}
-                setEndpoint={setEndpoint}
-                ping={ping}
-                canRun={canRun}
-                running={status === "running"}
-                onAnalyze={runAnalysis}
-                linkUrl={linkUrl}
-                setLinkUrl={setLinkUrl}
-                linkStatus={linkStatus}
-                linkError={linkError}
-                linkInfo={linkInfo}
-                onLoadLink={handleLoadLink}
-                onClearLink={handleClearLink}
-                onPasteLink={handlePasteLink}
-              />
-            </div>
-
-            <div ref={reportWrapRef} className="min-w-0 scroll-mt-6">
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+            {/* Left Column: Master Song Map, Lyrics, DAW Timeline & Breakdown */}
+            <div ref={reportWrapRef} className="min-w-0 scroll-mt-6 order-1">
               {fallbackNote && (
                 <div className="mb-4 rounded-lg border border-amber/45 bg-amber/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-amber">
                   <span className="font-bold tracking-[0.14em]">FALLBACK · </span>
@@ -562,7 +532,7 @@ export default function App() {
                       <span className="cursor-blink ml-2 inline-block h-[0.72em] w-[0.45em] translate-y-[0.08em] bg-amber/80" />
                     </h2>
                     <p className="mt-4 max-w-xl text-sm leading-relaxed text-dim">
-                      Drop a track in the console — or paste a link. Direct audio URLs are fetched and broken down
+                      Drop a track in the console on the right — or paste a link. Direct audio URLs are fetched and broken down
                       locally; YouTube, Spotify and SoundCloud links are read and played through their official
                       players. Every number stays labeled by how it was produced.
                     </p>
@@ -571,7 +541,7 @@ export default function App() {
                       <FlatlineBlip />
                     </div>
 
-                    <ol className="mt-8 flex max-w-xl flex-col gap-3">
+                    <ol className="mt-8 flex flex-col gap-3">
                       {[
                         ["01", "Add a file or paste a link", "WAV / MP3 / FLAC uploads, direct audio URLs, or YouTube / Spotify / SoundCloud links."],
                         ["02", "Lyrics — paste them or let Whisper hear them", "Tick transcribe and Whisper adds the lyrics automatically; then rhyme, flow and hook metrics follow. Fragments only, never full lyrics."],
@@ -589,6 +559,38 @@ export default function App() {
                   </div>
                 </Reveal>
               )}
+            </div>
+
+            {/* Right Column: Feed the Analyzer / Input Console */}
+            <div className="lg:sticky lg:top-6 order-2">
+              <ConsolePanel
+                title={title}
+                setTitle={setTitle}
+                artist={artist}
+                setArtist={setArtist}
+                file={file}
+                setFile={setFileExclusive}
+                lyrics={lyrics}
+                setLyrics={setLyrics}
+                transcribe={transcribe}
+                setTranscribe={setTranscribe}
+                engine={engine}
+                setEngine={setEngine}
+                endpoint={endpoint}
+                setEndpoint={setEndpoint}
+                ping={ping}
+                canRun={canRun}
+                running={status === "running"}
+                onAnalyze={runAnalysis}
+                linkUrl={linkUrl}
+                setLinkUrl={setLinkUrl}
+                linkStatus={linkStatus}
+                linkError={linkError}
+                linkInfo={linkInfo}
+                onLoadLink={handleLoadLink}
+                onClearLink={handleClearLink}
+                onPasteLink={handlePasteLink}
+              />
             </div>
           </div>
         )}

@@ -8,6 +8,7 @@ import { HarmonicPanel } from "./HarmonicPanel";
 import { InstrumentMatrixPanel } from "./InstrumentMatrixPanel";
 import { ProducerInsightsPanel } from "./ProducerInsightsPanel";
 import { SyncedLyricsRack } from "./SyncedLyricsRack";
+import { FullSongDAWMap } from "./FullSongDAWMap";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -419,6 +420,17 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
             finding={{ value: meanEnergyPct, tier: "measured", source: "RMS mean over track" }}
           />
         </div>
+      </Reveal>
+
+      {/* master full-song DAW arrangement map */}
+      <Reveal delay={70}>
+        <FullSongDAWMap
+          report={{ ...report, sections: effectiveSections }}
+          currentTime={currentPlaybackTime}
+          duration={effectiveDuration}
+          isPlaying={isPlaybackPlaying}
+          onSeek={handleSeek}
+        />
       </Reveal>
 
       {/* structure + energy */}
