@@ -121,12 +121,33 @@ export interface SectionInstruments {
   layeringDescription: string;
 }
 
+export interface ChannelPattern {
+  id: string;
+  num: string;
+  name: string;
+  category: "all" | "drums" | "chords" | "synths" | "strings";
+  color: string;
+  glow: string;
+  pan: number;
+  vol: number;
+  family: string;
+  steps: boolean[];
+  description: string;
+}
+
+export interface SectionPatternMap {
+  sectionLabel: string;
+  patternNumber: string;
+  channels: ChannelPattern[];
+}
+
 export interface InstrumentBreakdown {
   dominantFamily: string;
   detectedCount: number;
   instruments: InstrumentInfo[];
   sectionMatrix: SectionInstruments[];
   arrangementPacing: string;
+  sectionPatterns?: Record<string, ChannelPattern[]>;
 }
 
 export interface ReportData {

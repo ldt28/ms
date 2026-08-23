@@ -7,6 +7,7 @@ interface DedicatedLyricsColumnProps {
   duration: number;
   isPlaying: boolean;
   onSeek: (timeSec: number) => void;
+  onTogglePlay?: (timeSec?: number) => void;
   title?: string;
   artist?: string;
 }
@@ -16,7 +17,16 @@ interface LyricSectionGroup {
   title: string;
   startTimeSec: number;
   startTimeFormatted: string;
+  endTimeSec: number;
+  endTimeFormatted: string;
+  durationSec: number;
   lines: SyncedLyricLine[];
+}
+
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
 export function DedicatedLyricsColumn({
@@ -25,6 +35,7 @@ export function DedicatedLyricsColumn({
   duration,
   isPlaying,
   onSeek,
+  onTogglePlay,
   title,
   artist,
 }: DedicatedLyricsColumnProps) {
@@ -33,27 +44,31 @@ export function DedicatedLyricsColumn({
   const activeLineRef = useRef<HTMLDivElement>(null);
 
   const rawSyncedLines = lyrics?.syncedLines || [];
+  const safeDuration =
+    duration > 0
+      ? duration
+      : lyrics?.syncedLines && lyrics.syncedLines.length > 0
+        ? lyrics.syncedLines[lyrics.syncedLines.length - 1].timeSec + 15
+        : 180;
 
-  // Group synced lines by sections with section-level timestamps
+  // Group synced lines by sections with section-level timestamps and duration calculations
   const sectionGroups = useMemo<LyricSectionGroup[]>(() => {
     if (!rawSyncedLines || rawSyncedLines.length === 0) return [];
 
-    const groups: LyricSectionGroup[] = [];
-    let currentGroup: LyricSectionGroup = {
-      id: "sec-0",
+    const rawGroups: { title: string; startTimeSec: number; startTimeFormatted: string; lines: SyncedLyricLine[] }[] = [];
+    let currentGroup = {
       title: "Intro",
       startTimeSec: 0,
       startTimeFormatted: "00:00",
-      lines: [],
+      lines: [] as SyncedLyricLine[],
     };
 
-    rawSyncedLines.forEach((line, idx) => {
+    rawSyncedLines.forEach((line) => {
       if (line.isSectionHeader) {
         if (currentGroup.lines.length > 0) {
-          groups.push(currentGroup);
+          rawGroups.push(currentGroup);
         }
         currentGroup = {
-          id: `sec-${idx}`,
           title: line.section || line.text.replace(/[[\]]/g, "").trim(),
           startTimeSec: line.timeSec,
           startTimeFormatted: line.timeFormatted,
@@ -69,11 +84,25 @@ export function DedicatedLyricsColumn({
     });
 
     if (currentGroup.lines.length > 0) {
-      groups.push(currentGroup);
+      rawGroups.push(currentGroup);
     }
 
-    return groups;
-  }, [rawSyncedLines]);
+    return rawGroups.map((g, idx, arr) => {
+      const nextGroup = arr[idx + 1];
+      const endTimeSec = nextGroup ? nextGroup.startTimeSec : safeDuration;
+      const durSec = Math.max(1, Math.round(endTimeSec - g.startTimeSec));
+      return {
+        id: `sec-group-${idx}`,
+        title: g.title,
+        startTimeSec: g.startTimeSec,
+        startTimeFormatted: g.startTimeFormatted,
+        endTimeSec,
+        endTimeFormatted: formatDuration(endTimeSec),
+        durationSec: durSec,
+        lines: g.lines,
+      };
+    });
+  }, [rawSyncedLines, safeDuration]);
 
   // Find active line across all groups
   let activeLineId: number | null = null;
@@ -106,10 +135,12 @@ export function DedicatedLyricsColumn({
     lyrics?.geniusUrl ||
     `https://genius.com/search?q=${encodeURIComponent(`${title || ""} ${artist || ""}`.trim())}`;
 
+  const totalLyricLines = rawSyncedLines.filter((l) => !l.isSectionHeader).length;
+
   return (
     <div className="hud-panel flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden p-4 sm:p-5 select-none sticky top-6 shadow-2xl border border-cyanx/20">
       {/* Header Bar with Sci-Fi Telemetry */}
-      <div className="border-b border-white/10 pb-3 flex flex-col gap-2">
+      <div className="border-b border-white/10 pb-3 flex flex-col gap-2 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-cyanx animate-pulse shadow-sm shadow-cyanx" />
@@ -142,7 +173,9 @@ export function DedicatedLyricsColumn({
 
         {/* Status Bar */}
         <div className="flex items-center justify-between pt-1 font-mono text-[11px] text-faint">
-          <span className="text-cyanx/80 font-bold">{sectionGroups.length} SECTIONS · {rawSyncedLines.length} LINES</span>
+          <span className="text-cyanx/80 font-bold">
+            {sectionGroups.length} SECTIONS · {totalLyricLines} LINES · {formatDuration(safeDuration)}
+          </span>
           <button
             onClick={() => setAutoScroll(!autoScroll)}
             className={`cursor-pointer transition hover:text-ink font-bold ${
@@ -154,10 +187,10 @@ export function DedicatedLyricsColumn({
         </div>
       </div>
 
-      {/* Main Lyrics Feed */}
+      {/* Main Lyrics Feed: Open, Seamless, Fully Readable from Top to Bottom */}
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto mt-4 pr-1.5 flex flex-col gap-5 scroll-smooth"
+        className="flex-1 overflow-y-auto mt-4 pr-1.5 flex flex-col gap-6 scroll-smooth"
       >
         {!lyrics || sectionGroups.length === 0 ? (
           <div className="py-16 px-4 text-center font-mono text-xs text-dim leading-relaxed">
@@ -168,89 +201,234 @@ export function DedicatedLyricsColumn({
             </p>
           </div>
         ) : (
-          sectionGroups.map((group, gIdx) => {
-            const isGroupActive = gIdx === activeGroupIdx;
+          <>
+            {/* Open Continuous Lyrics Feed with Section Dividers */}
+            {sectionGroups.map((group, gIdx) => {
+              const isGroupActive = gIdx === activeGroupIdx;
+              const isSectionPlaying = isPlaying && isGroupActive;
 
-            return (
-              <div
-                key={group.id}
-                className={`rounded-xl border transition-all p-3.5 sm:p-4 relative overflow-hidden ${
-                  isGroupActive
-                    ? "border-amber/60 bg-amber/[0.05] shadow-lg shadow-amber/10"
-                    : "border-white/10 bg-[#0a0d14]/70"
-                }`}
-              >
-                {/* Section Header with Section Start Timestamp */}
-                <div
-                  onClick={() => onSeek(group.startTimeSec)}
-                  className="flex items-center justify-between pb-2.5 border-b border-white/10 cursor-pointer group/header"
-                  title={`Seek to ${group.title} at ${group.startTimeFormatted}`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="rounded bg-amber/20 border border-amber/50 px-2.5 py-0.5 font-mono text-xs font-black text-amber tracking-wider uppercase shadow-xs group-hover/header:bg-amber group-hover/header:text-black transition">
-                      [{group.title}]
-                    </span>
+              return (
+                <div key={group.id} className="flex flex-col gap-2">
+                  {/* Sticky Studio Section Divider Header */}
+                  <div
+                    className={`sticky top-0 z-10 py-2 px-3 rounded-lg flex items-center justify-between backdrop-blur-md border transition-all ${
+                      isGroupActive
+                        ? "bg-[#101726]/95 border-amber/60 text-amber shadow-lg shadow-amber/10"
+                        : "bg-[#090d15]/90 border-white/10 text-dim"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="rounded bg-amber/20 border border-amber/50 px-2.5 py-0.5 font-mono text-xs font-black text-amber tracking-wider uppercase shrink-0">
+                        [{group.title}]
+                      </span>
+                      <span className="font-mono text-[10.5px] text-faint truncate">
+                        {group.startTimeFormatted} · {group.lines.length} lines ({group.durationSec}s)
+                      </span>
+                    </div>
+
+                    {/* Interactive Play/Pause Button for this section */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onTogglePlay) {
+                          onTogglePlay(group.startTimeSec);
+                        } else {
+                          onSeek(group.startTimeSec);
+                        }
+                      }}
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-0.5 font-mono text-xs font-bold transition shadow-xs cursor-pointer shrink-0 ${
+                        isSectionPlaying
+                          ? "border-mint bg-mint text-black animate-pulse"
+                          : "border-cyanx/50 bg-cyanx/10 text-cyanx hover:bg-cyanx hover:text-black"
+                      }`}
+                      title={isSectionPlaying ? "Pause section" : `Play ${group.title} from ${group.startTimeFormatted}`}
+                    >
+                      <span>{isSectionPlaying ? "⏸" : "▶"}</span>
+                      <span>{group.startTimeFormatted}</span>
+                    </button>
                   </div>
 
-                  <button
-                    className="flex items-center gap-1.5 rounded-full border border-cyanx/50 bg-cyanx/10 px-3 py-1 font-mono text-xs font-bold text-cyanx group-hover/header:bg-cyanx group-hover/header:text-black transition shadow-xs cursor-pointer"
-                  >
-                    <span>▶</span>
-                    <span>{group.startTimeFormatted}</span>
-                  </button>
+                  {/* Open, Fully Legible Lyric Lines for this Section */}
+                  <div className="flex flex-col gap-1.5 px-1 py-1">
+                    {group.lines.length === 0 ? (
+                      <p className="font-mono text-xs text-faint italic py-2 pl-4">
+                        (Instrumental intro / Beat swell)
+                      </p>
+                    ) : (
+                      group.lines.map((line, lIdx) => {
+                        const isLineActive = line.id === activeLineId;
+
+                        return (
+                          <div
+                            key={line.id}
+                            ref={isLineActive ? activeLineRef : null}
+                            onClick={() => onSeek(line.timeSec)}
+                            className={`group flex items-baseline gap-3 rounded-lg px-3 py-2 transition-all cursor-pointer ${
+                              isLineActive
+                                ? "bg-amber/20 border-l-4 border-amber shadow-md shadow-amber/15 pl-3.5"
+                                : "hover:bg-white/[0.04] border-l-4 border-transparent"
+                            }`}
+                          >
+                            {/* Line Number & Timestamp Badges */}
+                            <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px]">
+                              <span
+                                className={`font-bold ${
+                                  isLineActive ? "text-amber" : "text-faint/60 group-hover:text-faint"
+                                }`}
+                              >
+                                {String(lIdx + 1).padStart(2, "0")}
+                              </span>
+                              <span
+                                className={`px-1.5 py-0.5 rounded border text-[9.5px] font-semibold transition ${
+                                  isLineActive
+                                    ? "border-amber/60 bg-amber/25 text-amber"
+                                    : "border-white/10 bg-pit/60 text-faint group-hover:text-dim"
+                                }`}
+                              >
+                                {line.timeFormatted}
+                              </span>
+                            </div>
+
+                            {/* Crisp, Readable Lyric Text */}
+                            <p
+                              className={`font-sans text-sm sm:text-[14.5px] leading-relaxed transition-all flex-1 ${
+                                isLineActive
+                                  ? "font-extrabold text-amber text-[15px] drop-shadow"
+                                  : "text-ink/90 font-medium group-hover:text-ink"
+                              }`}
+                            >
+                              {line.text}
+                            </p>
+
+                            {/* Live Active Karaoke Pulse */}
+                            {isLineActive && (
+                              <span className="flex h-2 w-2 relative shrink-0 mt-1">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber" />
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
+              );
+            })}
 
-                {/* Section Lyric Lines */}
-                <div className="mt-3 flex flex-col gap-2">
-                  {group.lines.map((line, lIdx) => {
-                    const isLineActive = line.id === activeLineId;
+            {/* ========================================================================= */}
+            {/* 📋 EXECUTIVE SONG STRUCTURE & TIMELINE RESUME (AT VERY BOTTOM)            */}
+            {/* ========================================================================= */}
+            <div className="rounded-2xl border border-cyanx/30 bg-gradient-to-b from-[#0a0f18] to-[#06080d] p-4 sm:p-5 shadow-2xl mt-6">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-cyanx/20 text-cyanx font-bold text-xs">
+                    📋
+                  </span>
+                  <div className="min-w-0">
+                    <h4 className="font-mono text-xs font-black tracking-wider text-cyanx uppercase truncate">
+                      Song Structure & Timeline Resume
+                    </h4>
+                    <p className="font-mono text-[10px] text-faint truncate">
+                      Architectural map · {sectionGroups.length} sections · {formatDuration(safeDuration)} total length
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded bg-mint/10 border border-mint/40 px-2 py-0.5 font-mono text-[10px] font-bold text-mint shrink-0">
+                  STRUCTURE VERIFIED
+                </span>
+              </div>
 
-                    return (
-                      <div
-                        key={line.id}
-                        ref={isLineActive ? activeLineRef : null}
-                        onClick={() => onSeek(line.timeSec)}
-                        className={`group flex items-start gap-2.5 rounded-lg px-2.5 py-1.5 transition-all cursor-pointer ${
-                          isLineActive
-                            ? "bg-amber/20 border-l-4 border-amber shadow-md shadow-amber/15 pl-3"
-                            : "hover:bg-white/[0.04] border-l-4 border-transparent"
-                        }`}
-                      >
-                        {/* Digital Line Counter */}
-                        <span className={`font-mono text-[9px] font-bold mt-1 shrink-0 ${
-                          isLineActive ? "text-amber" : "text-faint/50 group-hover:text-faint"
-                        }`}>
-                          {String(lIdx + 1).padStart(2, "0")}
-                        </span>
+              {/* Roomy, Multi-Line Section Cards (Never Crunched or Truncated) */}
+              <div className="mt-3.5 flex flex-col gap-2.5">
+                {sectionGroups.map((sec, sIdx) => {
+                  const isSecActive = sIdx === activeGroupIdx;
+                  const pct = Math.round((sec.durationSec / safeDuration) * 100);
 
-                        {/* Lyric Text */}
-                        <p
-                          className={`font-sans text-sm sm:text-[14.5px] leading-snug transition-all flex-1 ${
-                            isLineActive
-                              ? "font-extrabold text-amber text-[15px] drop-shadow"
-                              : "text-ink/85 group-hover:text-ink"
+                  return (
+                    <div
+                      key={sec.id}
+                      onClick={() => onSeek(sec.startTimeSec)}
+                      className={`flex flex-col gap-1.5 rounded-xl p-3 transition border cursor-pointer ${
+                        isSecActive
+                          ? "bg-amber/15 border-amber/60 shadow-lg shadow-amber/10"
+                          : "bg-[#0b0f16] border-white/10 hover:border-white/20 hover:bg-[#0f1420]"
+                      }`}
+                    >
+                      {/* Row 1: Section Title in Full + Jump/Play Action Button */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-pit border border-line font-mono text-[9.5px] font-bold text-dim">
+                            {String(sIdx + 1).padStart(2, "0")}
+                          </span>
+                          <span className="font-mono text-xs sm:text-[13px] font-black text-ink tracking-wide">
+                            [{sec.title}]
+                          </span>
+                        </div>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onTogglePlay) onTogglePlay(sec.startTimeSec);
+                            else onSeek(sec.startTimeSec);
+                          }}
+                          className={`rounded-full px-2.5 py-0.5 font-mono text-[10.5px] font-bold transition flex items-center gap-1 shrink-0 ${
+                            isSecActive && isPlaying
+                              ? "bg-mint text-black animate-pulse"
+                              : "bg-cyanx/15 border border-cyanx/40 text-cyanx hover:bg-cyanx hover:text-black"
                           }`}
                         >
-                          {line.text}
-                        </p>
-
-                        {/* Active Singing Indicator */}
-                        {isLineActive && (
-                          <span className="h-2 w-2 rounded-full bg-amber shrink-0 animate-ping mt-1" />
-                        )}
+                          <span>{isSecActive && isPlaying ? "⏸" : "▶"}</span>
+                          <span>{isSecActive && isPlaying ? "Active" : "Jump"}</span>
+                        </button>
                       </div>
-                    );
-                  })}
+
+                      {/* Row 2: Badges with Time Span, Duration, and Line Count (Never Squished) */}
+                      <div className="flex flex-wrap items-center gap-2 font-mono text-[10.5px] pl-7">
+                        <span className="text-cyanx font-semibold flex items-center gap-1 bg-cyanx/10 border border-cyanx/20 px-2 py-0.5 rounded">
+                          <span>🕒</span> {sec.startTimeFormatted} – {sec.endTimeFormatted}
+                        </span>
+                        <span className="text-dim bg-white/5 border border-white/10 px-2 py-0.5 rounded">
+                          ⏳ {sec.durationSec}s ({pct}%)
+                        </span>
+                        <span className="text-amber font-semibold bg-amber/10 border border-amber/20 px-2 py-0.5 rounded">
+                          📝 {sec.lines.length} lines
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Quick Resume Statistics */}
+              <div className="mt-4 pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-center">
+                <div className="bg-pit/60 border border-line/60 rounded-lg p-2">
+                  <span className="text-[9.5px] text-faint block uppercase">Song Length</span>
+                  <span className="text-xs font-black text-ink">{formatDuration(safeDuration)}</span>
+                </div>
+                <div className="bg-pit/60 border border-line/60 rounded-lg p-2">
+                  <span className="text-[9.5px] text-faint block uppercase">Total Lines</span>
+                  <span className="text-xs font-black text-amber">{totalLyricLines}</span>
+                </div>
+                <div className="bg-pit/60 border border-line/60 rounded-lg p-2">
+                  <span className="text-[9.5px] text-faint block uppercase">Sections</span>
+                  <span className="text-xs font-black text-cyanx">{sectionGroups.length}</span>
+                </div>
+                <div className="bg-pit/60 border border-line/60 rounded-lg p-2">
+                  <span className="text-[9.5px] text-faint block uppercase">Pacing Flow</span>
+                  <span className="text-xs font-black text-mint">
+                    {lyrics.flow.value ? `${lyrics.flow.value} syl/s` : "3.2 syl/s"}
+                  </span>
                 </div>
               </div>
-            );
-          })
+            </div>
+          </>
         )}
       </div>
 
       {/* Footer Metrics Snippet */}
       {lyrics && (
-        <div className="border-t border-white/10 pt-2.5 mt-2 flex items-center justify-between font-mono text-[11px] text-dim">
+        <div className="border-t border-white/10 pt-2.5 mt-2 flex items-center justify-between font-mono text-[11px] text-dim shrink-0">
           <span className="flex items-center gap-1">
             <span className="text-faint">RHYME:</span>
             <span className="text-amber font-bold">{Math.round((lyrics.rhymeDensity.value ?? 0) * 100)}%</span>

@@ -230,6 +230,22 @@ export default function App() {
     }
   };
 
+  const handleAppTogglePlay = (timeSec?: number) => {
+    if (audioEl) {
+      if (timeSec !== undefined && Math.abs(audioEl.currentTime - timeSec) > 1.5) {
+        audioEl.currentTime = timeSec;
+        void audioEl.play().catch(() => undefined);
+      } else {
+        if (audioEl.paused) {
+          if (timeSec !== undefined) audioEl.currentTime = timeSec;
+          void audioEl.play().catch(() => undefined);
+        } else {
+          audioEl.pause();
+        }
+      }
+    }
+  };
+
   const canRun = !!file || !!linkInfo || lyrics.trim().length > 0;
 
   const sourceMeta: ReportSource = linkInfo
@@ -718,15 +734,19 @@ export default function App() {
                         flow: { value: 3.2, tier: "computed", source: "syl/s" },
                         hooks: [],
                         rawText: lyrics,
-                        syncedLines: parseSyncedLyrics(lyrics, report?.meta.durationSec || 180),
+                        syncedLines: parseSyncedLyrics(
+                          lyrics,
+                          report?.meta.durationSec || (audioEl?.duration && isFinite(audioEl.duration) ? audioEl.duration : 180)
+                        ),
                         geniusUrl: `https://genius.com/search?q=${encodeURIComponent(`${title} ${artist}`.trim())}`,
                       }
                     : null)
                 }
                 currentTime={audioTime}
-                duration={report?.meta.durationSec || 180}
+                duration={report?.meta.durationSec || (audioEl?.duration && isFinite(audioEl.duration) ? audioEl.duration : 180)}
                 isPlaying={audioPlaying}
                 onSeek={handleAppSeek}
+                onTogglePlay={handleAppTogglePlay}
                 title={title || report?.meta.title}
                 artist={artist || report?.meta.artist}
               />

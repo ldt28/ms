@@ -38,11 +38,15 @@ function loadYouTubeAPI(): Promise<any> {
 export interface YouTubeBridge {
   onDuration: (d: number) => void;
   onTime: (t: number) => void;
+  onStateChange?: (isPlaying: boolean) => void;
   onSeekReady: (seek: (t: number) => void) => void;
+  onTogglePlayReady?: (toggle: (targetTime?: number) => void) => void;
+  onPlayReady?: (play: () => void) => void;
+  onPauseReady?: (pause: () => void) => void;
 }
 
 /**
- * Mounts the official YT player into a div and streams duration/time back
+ * Mounts the official YT player into a div and streams duration/time/state back
  * through the bridge. Returns a ref to attach to the container div.
  */
 export function useYouTubePlayer(videoId: string | null, bridge: YouTubeBridge) {
@@ -70,8 +74,14 @@ export function useYouTubePlayer(videoId: string | null, bridge: YouTubeBridge) 
               bridgeRef.current.onDuration(d);
             }
           },
+          onStateChange: (event: any) => {
+            // 1: PLAYING, 2: PAUSED, 0: ENDED, 3: BUFFERING
+            const isPlaying = event.data === 1 || event.data === 3;
+            bridgeRef.current.onStateChange?.(isPlaying);
+          },
         },
       });
+
       bridgeRef.current.onSeekReady((t: number) => {
         try {
           player?.seekTo?.(t, true);
@@ -79,13 +89,56 @@ export function useYouTubePlayer(videoId: string | null, bridge: YouTubeBridge) 
           /* player not ready yet */
         }
       });
+
+      bridgeRef.current.onPlayReady?.(() => {
+        try {
+          player?.playVideo?.();
+        } catch {
+          /* ignore */
+        }
+      });
+
+      bridgeRef.current.onPauseReady?.(() => {
+        try {
+          player?.pauseVideo?.();
+        } catch {
+          /* ignore */
+        }
+      });
+
+      bridgeRef.current.onTogglePlayReady?.((targetTime?: number) => {
+        try {
+          const state = player?.getPlayerState?.();
+          if (state === 1) {
+            // Currently playing
+            if (targetTime !== undefined) {
+              const cur = player?.getCurrentTime?.() ?? 0;
+              if (Math.abs(cur - targetTime) > 2) {
+                player?.seekTo?.(targetTime, true);
+                player?.playVideo?.();
+                return;
+              }
+            }
+            player?.pauseVideo?.();
+          } else {
+            // Currently paused or unstarted
+            if (targetTime !== undefined) {
+              player?.seekTo?.(targetTime, true);
+            }
+            player?.playVideo?.();
+          }
+        } catch {
+          /* ignore */
+        }
+      });
+
       pollId = window.setInterval(() => {
         try {
           const t = player?.getCurrentTime?.();
           if (typeof t === "number" && t >= 0) bridgeRef.current.onTime(t);
           if (!durationSent) {
             const d = player?.getDuration?.() ?? 0;
-            if (d > 0) {
+            if (d > 0 && Number.isFinite(d)) {
               durationSent = true;
               bridgeRef.current.onDuration(d);
             }
@@ -93,7 +146,7 @@ export function useYouTubePlayer(videoId: string | null, bridge: YouTubeBridge) 
         } catch {
           /* ignore mid-destroy reads */
         }
-      }, 250);
+      }, 200);
     });
 
     return () => {

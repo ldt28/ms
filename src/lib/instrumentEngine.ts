@@ -6,6 +6,7 @@ import type {
   Section,
   SectionInstruments,
 } from "./types";
+import { generateDynamicPatterns } from "./patternEngine";
 
 export const INSTRUMENT_DEFINITIONS: Record<
   InstrumentId,
@@ -153,6 +154,7 @@ export function detectInstruments(report: ReportData): InstrumentBreakdown {
 
   const dominantFamily = instruments[0]?.name || "Drums & Bass";
   const detectedCount = instruments.filter((i) => i.detected).length;
+  const sectionPatterns = generateDynamicPatterns(report);
 
   return {
     dominantFamily,
@@ -160,5 +162,6 @@ export function detectInstruments(report: ReportData): InstrumentBreakdown {
     instruments,
     sectionMatrix,
     arrangementPacing: `${detectedCount} instrument layers with progressive build-up into Chorus`,
+    sectionPatterns,
   };
 }

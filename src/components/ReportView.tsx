@@ -16,6 +16,7 @@ import { ArtistDeepDivePanel } from "./ArtistDeepDivePanel";
 import { HarmonicDJAssistant } from "./HarmonicDJAssistant";
 import { VocalPitchHUD } from "./VocalPitchHUD";
 import { AnimatedSocialExportModal } from "./AnimatedSocialExportModal";
+import { AIProducerBlueprint } from "./AIProducerBlueprint";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -205,9 +206,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
   const [audioTime, setAudioTime] = useState(0);
   const [audioPlaying, setAudioPlaying] = useState(false);
 
-  // YouTube instrumented-player bridge: real duration + synced time + seek
+  // YouTube instrumented-player bridge: real duration + synced time + seek + play/pause
   const [yt, setYt] = useState<{ duration: number | null; time: number }>({ duration: null, time: 0 });
+  const [ytPlaying, setYtPlaying] = useState(false);
   const ytSeekRef = useRef<(t: number) => void>(() => {});
+  const ytTogglePlayRef = useRef<(t?: number) => void>(() => {});
 
   useEffect(() => {
     if (!audio) return;
@@ -227,14 +230,20 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
   // fresh report → drop previous player's state
   useEffect(() => {
     setYt({ duration: null, time: 0 });
+    setYtPlaying(false);
     ytSeekRef.current = () => {};
+    ytTogglePlayRef.current = () => {};
   }, [meta.analyzedAt]);
 
   const ytBridge: YouTubeBridge = {
     onDuration: (d) => setYt((m) => (m.duration === d ? m : { ...m, duration: d })),
     onTime: (t) => setYt((m) => (Math.abs(m.time - t) < 0.05 ? m : { ...m, time: t })),
+    onStateChange: (playing) => setYtPlaying(playing),
     onSeekReady: (fn) => {
       ytSeekRef.current = fn;
+    },
+    onTogglePlayReady: (fn) => {
+      ytTogglePlayRef.current = fn;
     },
   };
 
@@ -244,7 +253,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
     : null;
 
   const currentPlaybackTime = audio ? audioTime : yt.time;
-  const isPlaybackPlaying = audio ? audioPlaying : yt.time > 0;
+  const isPlaybackPlaying = audio ? audioPlaying : ytPlaying;
 
   const handleSeek = (t: number) => {
     if (audio) {
@@ -252,6 +261,27 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
       void audio.play().catch(() => undefined);
     } else if (ytExternal) {
       ytExternal.seek(t);
+    }
+  };
+
+  const handleTogglePlay = (targetTime?: number) => {
+    if (audio) {
+      if (targetTime !== undefined && Math.abs(audio.currentTime - targetTime) > 1.5) {
+        audio.currentTime = targetTime;
+        void audio.play().catch(() => {});
+        setAudioPlaying(true);
+      } else {
+        if (audio.paused) {
+          if (targetTime !== undefined) audio.currentTime = targetTime;
+          void audio.play().catch(() => {});
+          setAudioPlaying(true);
+        } else {
+          audio.pause();
+          setAudioPlaying(false);
+        }
+      }
+    } else if (isYouTube) {
+      ytTogglePlayRef.current(targetTime);
     }
   };
 
@@ -428,6 +458,84 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         </div>
       </Reveal>
 
+      {/* Master Studio Transport HUD */}
+      <Reveal delay={30}>
+        <div className="sticky top-0 z-30 rounded-2xl border border-cyanx/40 bg-gradient-to-r from-[#0d121f] via-[#090e18] to-[#0d121f] px-4 sm:px-6 py-3.5 shadow-2xl backdrop-blur-xl font-mono text-xs">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+            {/* Left: Giant Play/Pause & Live Time */}
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleTogglePlay()}
+                className={`flex h-11 items-center gap-2.5 rounded-xl px-4.5 font-mono text-xs font-black tracking-wider transition-all cursor-pointer shadow-lg shrink-0 ${
+                  isPlaybackPlaying
+                    ? "bg-mint text-black shadow-mint/30 ring-2 ring-mint animate-pulse"
+                    : "bg-cyanx text-black shadow-cyanx/40 hover:bg-white hover:scale-105"
+                }`}
+                title={isPlaybackPlaying ? "Pause Playback" : "Start Playback"}
+              >
+                <span className="text-base">{isPlaybackPlaying ? "⏸" : "▶"}</span>
+                <span>{isPlaybackPlaying ? "PAUSE" : "PLAY TRACK"}</span>
+              </button>
+
+              <div className="flex flex-col min-w-0">
+                <span className="font-mono text-base font-black text-ink tracking-tight">
+                  {formatTime(currentPlaybackTime)} <span className="text-faint text-xs font-normal">/ {formatTime(effectiveDuration)}</span>
+                </span>
+                <span className="text-[10px] text-cyanx font-bold flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-cyanx animate-ping" />
+                  {activeSection ? `[${activeSection.label.toUpperCase()}]` : "SYNCED PLAYHEAD"}
+                </span>
+              </div>
+            </div>
+
+            {/* Center: Full-width Scrubber Bar */}
+            <div className="flex-1 flex flex-col gap-1 max-w-xl">
+              <div
+                className="relative h-3.5 w-full rounded-full bg-pit/90 border border-white/10 cursor-pointer overflow-hidden group shadow-inner"
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                  handleSeek(pct * effectiveDuration);
+                }}
+              >
+                <div
+                  className="h-full bg-gradient-to-r from-cyanx via-mint to-amber transition-all duration-75"
+                  style={{ width: `${(currentPlaybackTime / effectiveDuration) * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-faint font-semibold">
+                <span>00:00</span>
+                <span className="text-dim">CLICK SCRUBBER TO JUMP</span>
+                <span>{formatTime(effectiveDuration)}</span>
+              </div>
+            </div>
+
+            {/* Right: Section Jump Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+              {effectiveSections.map((sec, idx) => {
+                const isActive = currentPlaybackTime >= sec.start && currentPlaybackTime < sec.end;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSeek(sec.start + 0.05)}
+                    className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold transition cursor-pointer shrink-0 ${
+                      isActive
+                        ? "bg-amber text-black shadow-md shadow-amber/40 font-black scale-105"
+                        : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-cyanx/50"
+                    }`}
+                    title={`Jump to ${sec.label} (${formatTime(sec.start)})`}
+                  >
+                    {sec.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Reveal>
+
       {/* source playback */}
       <Reveal delay={40}>
         <PlaybackPanel report={report} ytBridge={ytBridge} />
@@ -478,8 +586,15 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           currentTime={currentPlaybackTime}
           isPlaying={isPlaybackPlaying}
           activeSectionName={activeSection?.label || "Verse"}
+          bpm={effectiveTempo.value || 120}
           instruments={report.instruments}
+          report={report}
         />
+      </Reveal>
+
+      {/* AI Producer Suite & Song Reconstruction Masterclass */}
+      <Reveal delay={78}>
+        <AIProducerBlueprint report={report} />
       </Reveal>
 
       {/* structure + energy */}
@@ -499,7 +614,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
               </div>
             }
           />
-          <Timeline report={report} audio={audio} />
+          <Timeline report={report} audio={audio} external={ytExternal} />
         </div>
       </Reveal>
       )}

@@ -159,6 +159,8 @@ export function formatTimeSec(sec: number): string {
  * Supports English & Spanish section headers ([Verse], [Chorus], [Verso], [Coro], [Puente], [Estribillo], etc.)
  */
 export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyricLine[] {
+  if (!rawText || !rawText.trim()) return [];
+
   const lines = rawText.split(/\r?\n/);
   const result: SyncedLyricLine[] = [];
   let currentSection = "Intro";
@@ -212,9 +214,17 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
   // 2. If no LRC timestamps found, distribute plain text across song duration
   if (!hasLrcTimestamps || result.length === 0) {
     const validLines = lines.map((l) => l.trim()).filter(Boolean);
-    const totalLines = validLines.filter((l) => !l.match(/^\[([^\\[\\]]+)\]$/)).length;
-    const timeStep = totalLines > 0 ? Math.max(3, Math.min(6, (durationSec - 15) / Math.max(1, totalLines))) : 4;
-    let currentTime = 10;
+    const lyricLinesOnly = validLines.filter((l) => !l.match(/^\[([^\\[\\]]+)\]$/));
+    const totalLines = lyricLinesOnly.length;
+
+    // Ensure sensible song duration if duration is unknown, 30s preview, or 0
+    const safeDur = durationSec && durationSec >= 60 ? durationSec : Math.max(180, totalLines * 3.2);
+    const startOffset = Math.min(8, safeDur * 0.05);
+    const endOffset = Math.min(10, safeDur * 0.05);
+    const availableSpan = Math.max(20, safeDur - startOffset - endOffset);
+    const timeStep = totalLines > 1 ? availableSpan / (totalLines - 1) : 4;
+
+    let lineIdx = 0;
     const plainResult: SyncedLyricLine[] = [];
     currentSection = "Intro";
 
@@ -223,34 +233,36 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
       if (sectionMatch) {
         currentSection = sectionMatch[1].trim();
         explicitSectionCount++;
+        const currTime = Math.min(safeDur, startOffset + lineIdx * timeStep);
         plainResult.push({
           id: lineIdCounter++,
-          timeSec: currentTime,
-          timeFormatted: formatTimeSec(currentTime),
+          timeSec: currTime,
+          timeFormatted: formatTimeSec(currTime),
           text: `[${currentSection}]`,
           section: currentSection,
           isSectionHeader: true,
         });
       } else {
+        const currTime = Math.min(safeDur, startOffset + lineIdx * timeStep);
         plainResult.push({
           id: lineIdCounter++,
-          timeSec: Math.min(durationSec, currentTime),
-          timeFormatted: formatTimeSec(currentTime),
+          timeSec: currTime,
+          timeFormatted: formatTimeSec(currTime),
           text: rawLine,
           section: currentSection,
           isSectionHeader: false,
         });
-        currentTime += timeStep;
+        lineIdx++;
       }
     }
-    return autoSegmentIfSingleSection(plainResult, durationSec, explicitSectionCount);
+    return autoSegmentIfSingleSection(plainResult, safeDur, explicitSectionCount);
   }
 
   return autoSegmentIfSingleSection(result, durationSec, explicitSectionCount);
 }
 
 /**
- * If the lyrics came from LRC without explicit section headers, segment them into real musical sections.
+ * If the lyrics came without explicit section headers, segment them into real musical sections.
  */
 function autoSegmentIfSingleSection(
   lines: SyncedLyricLine[],
@@ -262,25 +274,25 @@ function autoSegmentIfSingleSection(
   }
 
   const safeDuration = durationSec > 0 ? durationSec : 180;
+  const lyricLines = lines.filter((l) => !l.isSectionHeader);
+  const totalLyrics = lyricLines.length;
   const segmented: SyncedLyricLine[] = [];
   let currentSecName = "";
   let lineCounter = 1000;
 
-  for (const line of lines) {
-    if (line.isSectionHeader) continue;
-
-    const t = line.timeSec;
+  lyricLines.forEach((line, idx) => {
+    const ratio = totalLyrics > 0 ? idx / totalLyrics : 0;
     let targetSection = "Verse 1";
 
-    if (t < safeDuration * 0.12) {
+    if (ratio < 0.05 && totalLyrics > 15) {
       targetSection = "Intro";
-    } else if (t < safeDuration * 0.38) {
+    } else if (ratio < 0.32) {
       targetSection = "Verse 1";
-    } else if (t < safeDuration * 0.58) {
+    } else if (ratio < 0.52) {
       targetSection = "Chorus / Hook";
-    } else if (t < safeDuration * 0.78) {
+    } else if (ratio < 0.76) {
       targetSection = "Verse 2";
-    } else if (t < safeDuration * 0.90) {
+    } else if (ratio < 0.90) {
       targetSection = "Chorus / Hook";
     } else {
       targetSection = "Outro";
@@ -303,7 +315,7 @@ function autoSegmentIfSingleSection(
       ...line,
       section: currentSecName,
     });
-  }
+  });
 
   return segmented;
 }
@@ -449,33 +461,48 @@ export async function fetchLiveLyrics(
 }
 
 /**
- * Generates an interactive musical cadence framework when lyrics are unreleased on databases.
+ * Generates an interactive musical cadence framework with full multi-line verses and hooks when lyrics are unreleased on databases.
  */
 function generateFallbackSongStructure(title: string, artist: string, durationSec: number): string {
   const safeDur = durationSec > 0 ? durationSec : 180;
-  const t1 = formatTimeSec(safeDur * 0.05);
-  const t2 = formatTimeSec(safeDur * 0.15);
-  const t3 = formatTimeSec(safeDur * 0.25);
-  const t4 = formatTimeSec(safeDur * 0.40);
-  const t5 = formatTimeSec(safeDur * 0.50);
-  const t6 = formatTimeSec(safeDur * 0.62);
-  const t7 = formatTimeSec(safeDur * 0.72);
-  const t8 = formatTimeSec(safeDur * 0.82);
-  const t9 = formatTimeSec(safeDur * 0.92);
+  const t = (pct: number) => formatTimeSec(safeDur * pct);
 
   return `[00:00.00] [Intro]
-[${t1}.00] 🎛️ (Beat & Bass Groove Starts)
-[${t2}.00] [Verse 1]
-[${t2}.50] ${artist || "Lead Vocal"} — ${title}
-[${t3}.00] Rhythmic vocal cadence & flow
-[${t4}.00] [Chorus / Hook]
-[${t4}.50] Main hook and harmonic drop
-[${t5}.00] Full energy beat & 808 slides
-[${t6}.00] [Verse 2]
-[${t6}.50] Second verse vocal stanza
-[${t7}.00] Dynamic bridge and melodic variation
-[${t8}.00] [Chorus / Hook]
-[${t8}.50] Final climax hook repetition
-[${t9}.00] [Outro]
-[${t9}.50] Beat fade & instrumental tail`;
+[${t(0.02)}.00] 🎛️ (Analog synth chords swell in stereo field)
+[${t(0.05)}.00] 🥁 (808 sub kick and hi-hat rolls enter)
+[${t(0.08)}.00] ${artist || "Lead Vocal"} — ${title}
+[${t(0.11)}.00] (Atmospheric vocal ad-libs and pitch glide)
+[${t(0.14)}.00] [Verse 1]
+[${t(0.15)}.00] Stepping in the booth with the rhythm on lock
+[${t(0.18)}.00] Hearing every frequency from bottom to top
+[${t(0.21)}.00] Dialed into the groove, never missing a beat
+[${t(0.24)}.00] Harmonic progression echoing through the street
+[${t(0.27)}.00] Double time flow with the cadence precise
+[${t(0.30)}.00] Layering the vocals, rolling the dice
+[${t(0.33)}.00] Bassline pumping through the master bus track
+[${t(0.36)}.00] Energy building up, no turning back
+[${t(0.39)}.00] [Chorus / Hook]
+[${t(0.40)}.00] Yeah we take it to the limit, feel the audio ignite
+[${t(0.43)}.00] Synchronized signals running through the night
+[${t(0.46)}.00] Heavyweight hook with the melody wide
+[${t(0.49)}.00] 808 drop and the vocal glide
+[${t(0.52)}.00] Feel the momentum taking over the floor
+[${t(0.55)}.00] Full spectrum power leaving nothing at the door
+[${t(0.58)}.00] [Verse 2]
+[${t(0.59)}.00] Back for the second verse, sharpening the tone
+[${t(0.62)}.00] Cutting through the mix in a league of our own
+[${t(0.65)}.00] Dynamic contrast moving high to the low
+[${t(0.68)}.00] Pocket so deep, watch the resonance grow
+[${t(0.71)}.00] Syllable precision keeping pace with the bar
+[${t(0.74)}.00] Mastered in the studio, reaching out far
+[${t(0.77)}.00] [Chorus / Hook]
+[${t(0.78)}.00] Yeah we take it to the limit, feel the audio ignite
+[${t(0.81)}.00] Synchronized signals running through the night
+[${t(0.84)}.00] Heavyweight hook with the melody wide
+[${t(0.87)}.00] 808 drop and the vocal glide
+[${t(0.90)}.00] [Outro]
+[${t(0.91)}.00] Filtering down as the frequencies fade
+[${t(0.94)}.00] Reverb tail lingering on the track we made
+[${t(0.97)}.00] Final bass pulse echoes out into air
+[${t(0.99)}.00] 🎛️ (Signal telemetry lock complete)`;
 }
