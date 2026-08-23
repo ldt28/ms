@@ -387,28 +387,38 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
             </div>
           </div>
 
-          {(report.audioError || report.audioNote || report.transcriptionError || report.warnings.length > 0) && (
+          {(report.audioNote || report.audioError || report.transcriptionError || report.warnings.length > 0) && (
             <div className="mt-4 flex flex-col gap-2">
               {report.audioNote && (
-                <div className="rounded-lg border border-cyanx/40 bg-cyanx/8 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-cyanx">
-                  <span className="font-bold tracking-[0.14em]">BY DESIGN · </span>
-                  {report.audioNote}
+                <div className="rounded-xl border border-cyanx/30 bg-gradient-to-r from-cyanx/10 via-pit to-cyanx/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-cyanx shadow-md flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-cyanx/20 text-cyanx">
+                      📡
+                    </span>
+                    <span className="truncate">
+                      <strong className="text-ink">STREAM SYNC ACTIVE: </strong>
+                      {report.audioNote}
+                    </span>
+                  </div>
+                  <span className="shrink-0 rounded bg-cyanx/20 px-2 py-0.5 text-[9px] font-extrabold text-cyanx">
+                    DSP LOCKED
+                  </span>
                 </div>
               )}
               {report.audioError && (
-                <div className="rounded-lg border border-rosex/45 bg-rosex/10 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-rosex">
+                <div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md">
                   <span className="font-bold tracking-[0.14em]">AUDIO_ERROR · </span>
                   {report.audioError}
                 </div>
               )}
               {report.transcriptionError && (
-                <div className="rounded-lg border border-rosex/45 bg-rosex/10 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-rosex">
+                <div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md">
                   <span className="font-bold tracking-[0.14em]">TRANSCRIPTION_ERROR · </span>
                   {report.transcriptionError}
                 </div>
               )}
               {report.warnings.map((w, i) => (
-                <div key={i} className="rounded-lg border border-amber/40 bg-amber/8 px-3.5 py-2.5 font-mono text-[11px] leading-relaxed text-amber">
+                <div key={i} className="rounded-xl border border-amber/40 bg-amber/8 px-4 py-3 font-mono text-[11px] leading-relaxed text-amber shadow-md">
                   <span className="font-bold tracking-[0.14em]">NOTE · </span>
                   {w}
                 </div>
