@@ -1,6 +1,7 @@
 /**
  * Live Lyrics Fetcher using LRCLIB open-source lyrics database API.
  * Free, zero-API-key required, CORS-friendly open database of synced and plain lyrics.
+ * Full multilingual support for English, Spanish, Portuguese, French, and international tracks.
  */
 
 import type { SyncedLyricLine } from "./types";
@@ -28,12 +29,19 @@ export interface FetchLyricsResponse {
 }
 
 /**
+ * Remove accent marks and diacritics for fallback search (e.g. "Tití Me Preguntó" -> "Titi Me Pregunto").
+ */
+export function removeDiacritics(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
  * Clean track title by stripping common YouTube suffixes like (Official Video), [Audio], etc.
  */
 export function cleanSongTitle(raw: string): string {
   return raw
-    .replace(/\s*[([{\\/].*?(official|video|audio|lyrics|music video|hd|4k|remastered|visualizer|ft\.|feat\.).*?[)\]}\\/]/gi, "")
-    .replace(/\s*-\s*(official|audio|video|lyrics).*/gi, "")
+    .replace(/\s*[([{\\/].*?(official|video|audio|lyrics|music video|hd|4k|remastered|visualizer|ft\.|feat\.|en vivo|letra).*?[)\]}\\/]/gi, "")
+    .replace(/\s*-\s*(official|audio|video|lyrics|letra).*/gi, "")
     .trim();
 }
 
@@ -55,6 +63,7 @@ export function formatTimeSec(sec: number): string {
 
 /**
  * Parses raw synced LRC strings or plain text lyrics into structured timestamped lines with section tags.
+ * Supports English & Spanish section headers ([Verse], [Chorus], [Verso], [Coro], [Puente], [Estribillo], etc.)
  */
 export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyricLine[] {
   const lines = rawText.split(/\r?\n/);
@@ -68,8 +77,8 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Check if line is a section header like [Verse 1], [Chorus], [Bridge]
-    const sectionMatch = trimmed.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/);
+    // Check if line is a section header like [Verse 1], [Chorus], [Coro], [Verso 1], [Puente]
+    const sectionMatch = trimmed.match(/^\[([^\\[\\]]+)\]$/);
     if (sectionMatch && !trimmed.match(/^\[\d+:\d+/)) {
       currentSection = sectionMatch[1].trim();
       result.push({
@@ -107,18 +116,17 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
 
   // 2. If no LRC timestamps found, distribute plain text across the song duration
   if (!hasLrcTimestamps || result.length === 0) {
-    const plainLines: string[] = [];
     currentSection = "Intro";
     const plainResult: SyncedLyricLine[] = [];
 
     // Filter valid lines
     const validLines = lines.map((l) => l.trim()).filter(Boolean);
-    const totalLines = validLines.filter((l) => !l.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/)).length;
+    const totalLines = validLines.filter((l) => !l.match(/^\[([^\\[\\]]+)\]$/)).length;
     const timeStep = totalLines > 0 ? Math.max(3, Math.min(6, (durationSec - 15) / Math.max(1, totalLines))) : 4;
     let currentTime = 10; // start 10s into the track
 
     for (const rawLine of validLines) {
-      const sectionMatch = rawLine.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/);
+      const sectionMatch = rawLine.match(/^\[([^\\[\\]]+)\]$/);
       if (sectionMatch) {
         currentSection = sectionMatch[1].trim();
         plainResult.push({
@@ -159,7 +167,27 @@ export function stripSyncedTimestamps(syncedLyrics?: string): string {
 }
 
 /**
- * Fetch lyrics by Track Title and Artist Name.
+ * Helper to query LRCLIB search endpoint.
+ */
+async function queryLrclibSearch(query: string): Promise<LyricsSearchResult | null> {
+  try {
+    const url = `https://lrclib.net/api/search?q=${encodeURIComponent(query)}`;
+    const resp = await fetch(url, {
+      headers: { "User-Agent": "SignalAudioBreakdown/1.0 (https://github.com)" },
+    });
+    if (!resp.ok) return null;
+    const results = (await resp.json()) as LyricsSearchResult[];
+    if (Array.isArray(results) && results.length > 0) {
+      return results.find((r) => r.plainLyrics || r.syncedLyrics) ?? null;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fetch lyrics by Track Title and Artist Name with Spanish & international diacritic fallbacks.
  */
 export async function fetchLiveLyrics(
   title: string,
@@ -176,7 +204,7 @@ export async function fetchLiveLyrics(
   const geniusUrl = `https://genius.com/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`.trim())}`;
 
   try {
-    // 1. Try exact get endpoint if both title and artist are present
+    // 1. Try exact GET endpoint
     if (cleanArtist) {
       const getUrl = `https://lrclib.net/api/get?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
       const resp = await fetch(getUrl, {
@@ -204,34 +232,38 @@ export async function fetchLiveLyrics(
       }
     }
 
-    // 2. Search endpoint fallback (searches title + artist combined query)
-    const searchQuery = cleanArtist ? `${cleanTitle} ${cleanArtist}` : cleanTitle;
-    const searchUrl = `https://lrclib.net/api/search?q=${encodeURIComponent(searchQuery)}`;
-    const searchResp = await fetch(searchUrl, {
-      headers: { "User-Agent": "SignalAudioBreakdown/1.0 (https://github.com)" },
-    });
+    // 2. Search with Title + Artist
+    let match = await queryLrclibSearch(cleanArtist ? `${cleanTitle} ${cleanArtist}` : cleanTitle);
 
-    if (searchResp.ok) {
-      const results = (await searchResp.json()) as LyricsSearchResult[];
-      if (Array.isArray(results) && results.length > 0) {
-        const match = results.find((r) => r.plainLyrics || r.syncedLyrics);
-        if (match) {
-          const rawSynced = match.syncedLyrics || "";
-          const rawPlain = match.plainLyrics || stripSyncedTimestamps(rawSynced);
-          if (rawPlain && rawPlain.trim().length > 0) {
-            const syncedLines = parseSyncedLyrics(rawSynced || rawPlain, match.duration || durationSec);
-            return {
-              success: true,
-              lyrics: rawPlain.trim(),
-              syncedLyricsRaw: rawSynced,
-              syncedLines,
-              geniusUrl,
-              trackName: match.trackName,
-              artistName: match.artistName,
-              source: "lrclib",
-            };
-          }
-        }
+    // 3. Fallback: Search with Diacritics Removed (e.g. "Tití Me Preguntó" -> "Titi Me Pregunto")
+    if (!match) {
+      const unaccentedTitle = removeDiacritics(cleanTitle);
+      const unaccentedArtist = removeDiacritics(cleanArtist);
+      if (unaccentedTitle !== cleanTitle || unaccentedArtist !== cleanArtist) {
+        match = await queryLrclibSearch(unaccentedArtist ? `${unaccentedTitle} ${unaccentedArtist}` : unaccentedTitle);
+      }
+    }
+
+    // 4. Fallback: Search Title only
+    if (!match && cleanTitle.length > 3) {
+      match = await queryLrclibSearch(cleanTitle);
+    }
+
+    if (match) {
+      const rawSynced = match.syncedLyrics || "";
+      const rawPlain = match.plainLyrics || stripSyncedTimestamps(rawSynced);
+      if (rawPlain && rawPlain.trim().length > 0) {
+        const syncedLines = parseSyncedLyrics(rawSynced || rawPlain, match.duration || durationSec);
+        return {
+          success: true,
+          lyrics: rawPlain.trim(),
+          syncedLyricsRaw: rawSynced,
+          syncedLines,
+          geniusUrl,
+          trackName: match.trackName,
+          artistName: match.artistName,
+          source: "lrclib",
+        };
       }
     }
 

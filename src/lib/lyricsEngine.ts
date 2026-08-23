@@ -18,18 +18,19 @@ export class LyricsError extends Error {
 }
 
 function syllables(word: string): number {
-  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  const w = word.toLowerCase().replace(/[^a-zà-ÿñ]/g, "");
   if (!w) return 0;
-  const groups = w.match(/[aeiouy]+/g);
+  // Match English and Spanish / Romance vowels
+  const groups = w.match(/[aeiouyáéíóúüàèìòù]+/g);
   let n = groups ? groups.length : 1;
   if (w.endsWith("e") && !w.endsWith("le") && n > 1) n--;
   if (w.endsWith("ed") && n > 1 && w.length > 3) n--;
   return Math.max(1, n);
 }
 
-/** Naive end-rhyme signature: stripped spelling tail of the last word. */
+/** End-rhyme signature: handles English and Spanish vowel endings (e.g. -ía, -ón, -ado). */
 function endSound(line: string): string {
-  const words = line.toLowerCase().replace(/[^a-z'\s]/g, "").split(/\s+/).filter(Boolean);
+  const words = line.toLowerCase().replace(/[^a-zà-ÿñ'\s]/g, "").split(/\s+/).filter(Boolean);
   let w = words[words.length - 1] ?? "";
   if (w.length <= 3) return w;
   if (w.endsWith("es")) w = w.slice(0, -2);
