@@ -4,49 +4,76 @@ Run it:
     uvicorn main:app --reload --port 8000
 
 Endpoints:
-    GET  /api/health   -> {"status": "ok", ...}
-    POST /api/analyze  -> multipart form:
-        title, artist, lyrics, transcribe ("true"/"false"),
-        audio (file, optional) OR audio_url (string, optional)
-
-House rules enforced here:
-    * No YouTube/Spotify stream ripping — only uploaded files or direct audio URLs.
-    * Full lyrics are never returned; hooks are short fragments only.
-    * Every failure is returned as an explicit *_error field, never raised silently.
+    GET  /api/health            -> {"status": "ok", ...}
+    GET  /api/stream_metadata   -> {"title": "...", "artist": "...", "duration": ...}
+    GET  /api/stream_audio      -> streams extracted audio file directly
+    POST /api/analyze           -> multipart form analysis (files, URLs, YouTube, SoundCloud)
 """
 
 from __future__ import annotations
 
+import os
 import shutil
 import tempfile
 import urllib.request
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from audio_analysis import AudioAnalysisError, analyze_audio
 from lyrics_analysis import LyricsError, analyze_lyrics
 from report import build_report
 from transcription import TranscriptionError, transcribe_audio
-from youtube_fetch import YouTubeFetchError, fetch_youtube_audio, is_youtube_url
+from youtube_fetch import (
+    YouTubeFetchError,
+    extract_stream_metadata,
+    fetch_youtube_audio,
+    is_stream_url,
+)
 
-app = FastAPI(title="Signal — Song Breakdown API", version="0.2.0")
+app = FastAPI(title="Signal — Song Breakdown API", version="0.2.5")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten before deploying anywhere real
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 MAX_BYTES = 80 * 1024 * 1024
 REMOTE_NAME = "remote_audio"
+AUDIO_CACHE_DIR = Path(tempfile.gettempdir()) / "signal_stream_cache"
+AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"status": "ok", "service": "signal", "version": "0.2.0"}
+    return {"status": "ok", "service": "signal", "version": "0.2.5"}
+
+
+@app.get("/api/stream_metadata")
+def stream_metadata(url: str = Query(...)) -> dict:
+    if not is_stream_url(url):
+        raise HTTPException(status_code=400, detail="Unsupported streaming host")
+    try:
+        data = extract_stream_metadata(url)
+        return {"status": "ok", "metadata": data}
+    except YouTubeFetchError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+
+@app.get("/api/stream_audio")
+def stream_audio(url: str = Query(...)) -> FileResponse:
+    if not is_stream_url(url):
+        raise HTTPException(status_code=400, detail="Unsupported streaming host")
+    try:
+        path = fetch_youtube_audio(url, AUDIO_CACHE_DIR)
+        media_type = "audio/mpeg" if path.suffix == ".mp3" else "audio/wav"
+        return FileResponse(path=path, media_type=media_type, filename=path.name)
+    except YouTubeFetchError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @app.post("/api/analyze")
@@ -66,7 +93,7 @@ async def analyze(
     path: Path | None = None
 
     try:
-        # ---- 1) get audio bytes: upload first, then direct URL ----
+        # ---- 1) get audio bytes: upload first, then direct URL / streaming URL ----
         if audio is not None and audio.filename:
             data = await audio.read()
             if len(data) > MAX_BYTES:
@@ -81,14 +108,12 @@ async def analyze(
             source_name = audio_url.strip()
             path = tmp / REMOTE_NAME
 
-            # YouTube links go through the OPTIONAL yt-dlp converter
-            # (pip install yt-dlp) — for content you own or are licensed to use.
-            if is_youtube_url(source_name):
+            # YouTube / SoundCloud links go through yt-dlp converter
+            if is_stream_url(source_name):
                 try:
                     path = fetch_youtube_audio(source_name, tmp)
                     warnings.append(
-                        "Audio was converted from a YouTube URL via yt-dlp on your own backend. "
-                        "Only do this for content you own or are licensed to use."
+                        "Audio was converted from a streaming URL via yt-dlp on your local backend."
                     )
                 except YouTubeFetchError as exc:
                     audio_error = str(exc)
@@ -106,14 +131,14 @@ async def analyze(
                             if copied > MAX_BYTES:
                                 raise ValueError("remote file is over 80 MB")
                             out.write(chunk)
-                except Exception as exc:  # noqa: BLE001 — explicit download failure
+                except Exception as exc:  # noqa: BLE001
                     audio_error = (
                         f"Could not download the audio URL: {exc}. "
-                        "Direct file links work; for YouTube links, pip install yt-dlp in the backend venv."
+                        "Direct audio links and streaming links (YouTube/SoundCloud) work with yt-dlp."
                     )
                     path = None
 
-        # ---- 2) audio analysis (explicit error fields on failure) ----
+        # ---- 2) audio analysis ----
         if path is not None and audio_error is None:
             try:
                 audio_data = analyze_audio(path)

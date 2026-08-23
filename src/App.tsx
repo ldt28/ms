@@ -7,6 +7,7 @@ import { detectInstruments } from "./lib/instrumentEngine";
 import { ensureLyricLines, transcribeAudioBuffer, TranscribeError } from "./lib/transcribe";
 import { postToBackend } from "./lib/backend";
 import { resolveLink, type LinkInfo } from "./lib/linkResolver";
+import { fetchLiveLyrics } from "./lib/lyricsFetcher";
 import { ConsolePanel, type EngineMode, type LinkStatus } from "./components/ConsolePanel";
 import { ReportView } from "./components/ReportView";
 import { Roadmap } from "./components/Roadmap";
@@ -109,12 +110,31 @@ export default function App() {
     }
   };
 
-  const applyResolvedLink = (info: LinkInfo) => {
+  const applyResolvedLink = async (info: LinkInfo) => {
     setLinkInfo(info);
     setLinkStatus("idle");
     setLinkError(null);
-    // Only a DIRECT audio link competes with an uploaded file for the audio slot.
-    if (info.kind === "direct") setFile(null);
+
+    if (info.title && !title) setTitle(info.title);
+    if (info.artist && !artist) setArtist(info.artist);
+
+    if (info.audioFile) {
+      setFile(info.audioFile);
+    } else if (info.kind === "direct") {
+      setFile(null);
+    }
+
+    // Auto-fetch lyrics if not already supplied
+    if (!lyrics && info.title) {
+      try {
+        const res = await fetchLiveLyrics(info.title, info.artist);
+        if (res.success && res.lyrics) {
+          setLyrics(res.lyrics);
+        }
+      } catch {
+        // background fetch non-blocking
+      }
+    }
   };
 
   const handleLoadLink = async () => {
@@ -123,7 +143,7 @@ export default function App() {
     setLinkStatus("loading");
     setLinkError(null);
     try {
-      applyResolvedLink(await resolveLink(raw));
+      await applyResolvedLink(await resolveLink(raw));
     } catch (err) {
       setLinkInfo(null);
       setLinkStatus("error");
@@ -145,7 +165,7 @@ export default function App() {
     setLinkStatus("loading");
     setLinkError(null);
     try {
-      applyResolvedLink(await resolveLink(text));
+      await applyResolvedLink(await resolveLink(text));
     } catch (err) {
       setLinkInfo(null);
       setLinkStatus("error");
