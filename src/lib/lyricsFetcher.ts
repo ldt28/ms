@@ -71,16 +71,18 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
   let currentSection = "Intro";
   let hasLrcTimestamps = false;
   let lineIdCounter = 1;
+  let explicitSectionCount = 0;
 
-  // 1. First pass: check for [mm:ss.xx] timestamps
+  // 1. First pass: parse lines and timestamps
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // Check if line is a section header like [Verse 1], [Chorus], [Coro], [Verso 1], [Puente]
+    // Check if line is an explicit section header like [Verse 1], [Chorus], [Coro], [Verso 1], [Puente]
     const sectionMatch = trimmed.match(/^\[([^\\[\\]]+)\]$/);
     if (sectionMatch && !trimmed.match(/^\[\d+:\d+/)) {
       currentSection = sectionMatch[1].trim();
+      explicitSectionCount++;
       result.push({
         id: lineIdCounter++,
         timeSec: result.length > 0 ? result[result.length - 1].timeSec : 0,
@@ -114,21 +116,20 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
     }
   }
 
-  // 2. If no LRC timestamps found, distribute plain text across the song duration
+  // 2. If no LRC timestamps found, distribute plain text across song duration
   if (!hasLrcTimestamps || result.length === 0) {
-    currentSection = "Intro";
-    const plainResult: SyncedLyricLine[] = [];
-
-    // Filter valid lines
     const validLines = lines.map((l) => l.trim()).filter(Boolean);
     const totalLines = validLines.filter((l) => !l.match(/^\[([^\\[\\]]+)\]$/)).length;
     const timeStep = totalLines > 0 ? Math.max(3, Math.min(6, (durationSec - 15) / Math.max(1, totalLines))) : 4;
-    let currentTime = 10; // start 10s into the track
+    let currentTime = 10;
+    const plainResult: SyncedLyricLine[] = [];
+    currentSection = "Intro";
 
     for (const rawLine of validLines) {
       const sectionMatch = rawLine.match(/^\[([^\\[\\]]+)\]$/);
       if (sectionMatch) {
         currentSection = sectionMatch[1].trim();
+        explicitSectionCount++;
         plainResult.push({
           id: lineIdCounter++,
           timeSec: currentTime,
@@ -149,10 +150,69 @@ export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyr
         currentTime += timeStep;
       }
     }
-    return plainResult;
+    return autoSegmentIfSingleSection(plainResult, durationSec, explicitSectionCount);
   }
 
-  return result;
+  return autoSegmentIfSingleSection(result, durationSec, explicitSectionCount);
+}
+
+/**
+ * If the lyrics came from LRC without explicit section headers, segment them into real musical sections.
+ */
+function autoSegmentIfSingleSection(
+  lines: SyncedLyricLine[],
+  durationSec: number,
+  explicitSectionCount: number
+): SyncedLyricLine[] {
+  if (explicitSectionCount > 1 || lines.length === 0) {
+    return lines;
+  }
+
+  const safeDuration = durationSec > 0 ? durationSec : 180;
+  const segmented: SyncedLyricLine[] = [];
+  let currentSecName = "";
+  let lineCounter = 1000;
+
+  for (const line of lines) {
+    if (line.isSectionHeader) continue;
+
+    const t = line.timeSec;
+    let targetSection = "Verse 1";
+
+    if (t < safeDuration * 0.12) {
+      targetSection = "Intro";
+    } else if (t < safeDuration * 0.38) {
+      targetSection = "Verse 1";
+    } else if (t < safeDuration * 0.58) {
+      targetSection = "Chorus / Hook";
+    } else if (t < safeDuration * 0.78) {
+      targetSection = "Verse 2";
+    } else if (t < safeDuration * 0.90) {
+      targetSection = "Chorus / Hook";
+    } else {
+      targetSection = "Outro";
+    }
+
+    // When transitioning to a new section, insert section header
+    if (targetSection !== currentSecName) {
+      currentSecName = targetSection;
+      segmented.push({
+        id: lineCounter++,
+        timeSec: line.timeSec,
+        timeFormatted: formatTimeSec(line.timeSec),
+        text: `[${currentSecName}]`,
+        section: currentSecName,
+        isSectionHeader: true,
+      });
+    }
+
+    segmented.push({
+      ...line,
+      section: currentSecName,
+    });
+  }
+
+  return segmented;
 }
 
 /**

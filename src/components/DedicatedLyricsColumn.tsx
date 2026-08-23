@@ -90,12 +90,15 @@ export function DedicatedLyricsColumn({
     }
   }
 
-  // Smoothly auto-scroll to keep active line in view
+  // Smoothly auto-scroll container only without hijacking the browser window
   useEffect(() => {
     if (autoScroll && activeLineRef.current && containerRef.current) {
-      activeLineRef.current.scrollIntoView({
+      const container = containerRef.current;
+      const target = activeLineRef.current;
+      const targetOffset = target.offsetTop - container.offsetTop;
+      container.scrollTo({
+        top: Math.max(0, targetOffset - container.clientHeight / 3),
         behavior: "smooth",
-        block: "center",
       });
     }
   }, [activeLineId, autoScroll]);

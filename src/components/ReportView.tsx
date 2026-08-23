@@ -7,7 +7,6 @@ import { ExportModal } from "./ExportModal";
 import { HarmonicPanel } from "./HarmonicPanel";
 import { InstrumentMatrixPanel } from "./InstrumentMatrixPanel";
 import { ProducerInsightsPanel } from "./ProducerInsightsPanel";
-import { SyncedLyricsRack } from "./SyncedLyricsRack";
 import { FullSongDAWMap } from "./FullSongDAWMap";
 import { FLStudioChannelRack } from "./FLStudioChannelRack";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
@@ -597,22 +596,6 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
       <Reveal delay={55}>
         <InstrumentMatrixPanel report={report} />
       </Reveal>
-
-      {/* lyrics & FL Studio Channel Rack */}
-      {report.lyrics && (
-        <Reveal delay={60}>
-          <SyncedLyricsRack
-            lyrics={report.lyrics}
-            currentTime={currentPlaybackTime}
-            duration={effectiveDuration}
-            isPlaying={isPlaybackPlaying}
-            onSeek={handleSeek}
-            title={report.meta.title}
-            artist={report.meta.artist}
-            instruments={report.instruments}
-          />
-        </Reveal>
-      )}
 
       {/* text metrics */}
       <Reveal delay={65}>
