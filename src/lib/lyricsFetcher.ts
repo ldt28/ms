@@ -3,6 +3,8 @@
  * Free, zero-API-key required, CORS-friendly open database of synced and plain lyrics.
  */
 
+import type { SyncedLyricLine } from "./types";
+
 export interface LyricsSearchResult {
   id: number;
   trackName: string;
@@ -16,6 +18,9 @@ export interface LyricsSearchResult {
 export interface FetchLyricsResponse {
   success: boolean;
   lyrics: string | null;
+  syncedLyricsRaw?: string;
+  syncedLines?: SyncedLyricLine[];
+  geniusUrl?: string;
   trackName?: string;
   artistName?: string;
   source: "lrclib" | "fallback";
@@ -42,12 +47,124 @@ export function cleanArtistName(raw: string): string {
     .trim();
 }
 
+export function formatTimeSec(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Parses raw synced LRC strings or plain text lyrics into structured timestamped lines with section tags.
+ */
+export function parseSyncedLyrics(rawText: string, durationSec = 180): SyncedLyricLine[] {
+  const lines = rawText.split(/\r?\n/);
+  const result: SyncedLyricLine[] = [];
+  let currentSection = "Intro";
+  let hasLrcTimestamps = false;
+  let lineIdCounter = 1;
+
+  // 1. First pass: check for [mm:ss.xx] timestamps
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if line is a section header like [Verse 1], [Chorus], [Bridge]
+    const sectionMatch = trimmed.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/);
+    if (sectionMatch && !trimmed.match(/^\[\d+:\d+/)) {
+      currentSection = sectionMatch[1].trim();
+      result.push({
+        id: lineIdCounter++,
+        timeSec: result.length > 0 ? result[result.length - 1].timeSec : 0,
+        timeFormatted: formatTimeSec(result.length > 0 ? result[result.length - 1].timeSec : 0),
+        text: `[${currentSection}]`,
+        section: currentSection,
+        isSectionHeader: true,
+      });
+      continue;
+    }
+
+    const timestampMatch = trimmed.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
+    if (timestampMatch) {
+      hasLrcTimestamps = true;
+      const minutes = parseInt(timestampMatch[1], 10);
+      const seconds = parseInt(timestampMatch[2], 10);
+      const ms = timestampMatch[3] ? parseFloat(`0.${timestampMatch[3]}`) : 0;
+      const timeSec = minutes * 60 + seconds + ms;
+      const text = timestampMatch[4].trim();
+
+      if (text) {
+        result.push({
+          id: lineIdCounter++,
+          timeSec,
+          timeFormatted: formatTimeSec(timeSec),
+          text,
+          section: currentSection,
+          isSectionHeader: false,
+        });
+      }
+    }
+  }
+
+  // 2. If no LRC timestamps found, distribute plain text across the song duration
+  if (!hasLrcTimestamps || result.length === 0) {
+    const plainLines: string[] = [];
+    currentSection = "Intro";
+    const plainResult: SyncedLyricLine[] = [];
+
+    // Filter valid lines
+    const validLines = lines.map((l) => l.trim()).filter(Boolean);
+    const totalLines = validLines.filter((l) => !l.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/)).length;
+    const timeStep = totalLines > 0 ? Math.max(3, Math.min(6, (durationSec - 15) / Math.max(1, totalLines))) : 4;
+    let currentTime = 10; // start 10s into the track
+
+    for (const rawLine of validLines) {
+      const sectionMatch = rawLine.match(/^\[([a-zA-Z\s0-9/:-]+)\]$/);
+      if (sectionMatch) {
+        currentSection = sectionMatch[1].trim();
+        plainResult.push({
+          id: lineIdCounter++,
+          timeSec: currentTime,
+          timeFormatted: formatTimeSec(currentTime),
+          text: `[${currentSection}]`,
+          section: currentSection,
+          isSectionHeader: true,
+        });
+      } else {
+        plainResult.push({
+          id: lineIdCounter++,
+          timeSec: Math.min(durationSec, currentTime),
+          timeFormatted: formatTimeSec(currentTime),
+          text: rawLine,
+          section: currentSection,
+          isSectionHeader: false,
+        });
+        currentTime += timeStep;
+      }
+    }
+    return plainResult;
+  }
+
+  return result;
+}
+
+/**
+ * Strips LRC timestamps like [00:12.34] from lyrics for clean reading view.
+ */
+export function stripSyncedTimestamps(syncedLyrics?: string): string {
+  if (!syncedLyrics) return "";
+  return syncedLyrics
+    .replace(/^\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*/gm, "")
+    .replace(/\r?\n{3,}/g, "\n\n")
+    .trim();
+}
+
 /**
  * Fetch lyrics by Track Title and Artist Name.
  */
 export async function fetchLiveLyrics(
   title: string,
-  artist?: string
+  artist?: string,
+  durationSec = 180
 ): Promise<FetchLyricsResponse> {
   const cleanTitle = cleanSongTitle(title);
   const cleanArtist = artist ? cleanArtistName(artist) : "";
@@ -55,6 +172,8 @@ export async function fetchLiveLyrics(
   if (!cleanTitle) {
     return { success: false, lyrics: null, source: "lrclib", error: "Track title is required." };
   }
+
+  const geniusUrl = `https://genius.com/search?q=${encodeURIComponent(`${cleanTitle} ${cleanArtist}`.trim())}`;
 
   try {
     // 1. Try exact get endpoint if both title and artist are present
@@ -66,11 +185,17 @@ export async function fetchLiveLyrics(
 
       if (resp.ok) {
         const data = (await resp.json()) as LyricsSearchResult;
-        const lyrics = data.plainLyrics || stripSyncedTimestamps(data.syncedLyrics);
-        if (lyrics && lyrics.trim().length > 0) {
+        const rawSynced = data.syncedLyrics || "";
+        const rawPlain = data.plainLyrics || stripSyncedTimestamps(rawSynced);
+        
+        if (rawPlain && rawPlain.trim().length > 0) {
+          const syncedLines = parseSyncedLyrics(rawSynced || rawPlain, data.duration || durationSec);
           return {
             success: true,
-            lyrics: lyrics.trim(),
+            lyrics: rawPlain.trim(),
+            syncedLyricsRaw: rawSynced,
+            syncedLines,
+            geniusUrl,
             trackName: data.trackName,
             artistName: data.artistName,
             source: "lrclib",
@@ -89,14 +214,18 @@ export async function fetchLiveLyrics(
     if (searchResp.ok) {
       const results = (await searchResp.json()) as LyricsSearchResult[];
       if (Array.isArray(results) && results.length > 0) {
-        // Find best match with plainLyrics or syncedLyrics
         const match = results.find((r) => r.plainLyrics || r.syncedLyrics);
         if (match) {
-          const lyrics = match.plainLyrics || stripSyncedTimestamps(match.syncedLyrics);
-          if (lyrics && lyrics.trim().length > 0) {
+          const rawSynced = match.syncedLyrics || "";
+          const rawPlain = match.plainLyrics || stripSyncedTimestamps(rawSynced);
+          if (rawPlain && rawPlain.trim().length > 0) {
+            const syncedLines = parseSyncedLyrics(rawSynced || rawPlain, match.duration || durationSec);
             return {
               success: true,
-              lyrics: lyrics.trim(),
+              lyrics: rawPlain.trim(),
+              syncedLyricsRaw: rawSynced,
+              syncedLines,
+              geniusUrl,
               trackName: match.trackName,
               artistName: match.artistName,
               source: "lrclib",
@@ -109,27 +238,17 @@ export async function fetchLiveLyrics(
     return {
       success: false,
       lyrics: null,
+      geniusUrl,
       source: "lrclib",
-      error: `No lyrics found online for "${cleanTitle}"${cleanArtist ? ` by ${cleanArtist}` : ""}.`,
+      error: `No lyrics found for "${cleanTitle}". You can search Genius.com directly or paste them into the box.`,
     };
-  } catch (err: any) {
+  } catch (err) {
     return {
       success: false,
       lyrics: null,
-      source: "lrclib",
-      error: err.message || "Failed to reach live lyrics service.",
+      geniusUrl,
+      source: "fallback",
+      error: `Network error querying lyrics: ${err instanceof Error ? err.message : String(err)}`,
     };
   }
-}
-
-/**
- * Strips [00:12.34] timestamp tags from synced LRC text into clean lyrics.
- */
-function stripSyncedTimestamps(synced?: string): string | undefined {
-  if (!synced) return undefined;
-  return synced
-    .split("\n")
-    .map((line) => line.replace(/^\[\d{2}:\d{2}\.\d{2,3}\]\s*/, ""))
-    .filter((line) => line.trim().length > 0)
-    .join("\n");
 }

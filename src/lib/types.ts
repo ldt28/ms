@@ -30,6 +30,15 @@ export interface Hook {
   count: number;
 }
 
+export interface SyncedLyricLine {
+  id: number;
+  timeSec: number;
+  timeFormatted: string; // e.g. "00:15"
+  text: string;
+  section?: string; // e.g. "Verse 1", "Chorus", "Intro", "Bridge"
+  isSectionHeader?: boolean;
+}
+
 export interface LyricsBlock {
   source: "pasted" | "transcript";
   wordCount: number;
@@ -40,6 +49,8 @@ export interface LyricsBlock {
   flow: Finding<number | null>; // syllables per second (needs duration)
   hooks: Hook[];
   rawText?: string;
+  syncedLines?: SyncedLyricLine[];
+  geniusUrl?: string;
 }
 
 export interface ReportSource {

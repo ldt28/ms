@@ -6,6 +6,7 @@
  */
 
 import type { Finding, Hook, LyricsBlock } from "./types";
+import { parseSyncedLyrics } from "./lyricsFetcher";
 
 export class LyricsError extends Error {
   code: string;
@@ -109,6 +110,9 @@ export function analyzeLyrics(
     note,
   });
 
+  // Parse structured synced lines with timestamps and section headers
+  const syncedLines = parseSyncedLyrics(text, opts.durationSec || 180);
+
   return {
     source: opts.source,
     wordCount: totalWords,
@@ -127,5 +131,6 @@ export function analyzeLyrics(
     },
     hooks,
     rawText: text,
+    syncedLines,
   };
 }
