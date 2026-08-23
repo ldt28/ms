@@ -237,3 +237,41 @@ body::after {
     transition: none !important;
   }
 }
+
+/* ---------- print stylesheet (PDF Export) ---------- */
+@media print {
+  body {
+    background: #0b0e14 !important;
+    color: #e9e4d6 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body::after {
+    display: none !important;
+  }
+  .hide-on-print,
+  nav,
+  header button,
+  .btn-analyze,
+  aside,
+  [role="dialog"] {
+    display: none !important;
+  }
+  .signal-printable-report {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .panel {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 1px solid #27303f !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+

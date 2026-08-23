@@ -1,6 +1,9 @@
 import { useMemo, useRef, useState } from "react";
 import { formatBytes, type PingState } from "../lib/types";
 import type { LinkInfo } from "../lib/linkResolver";
+import { DEMO_PRESETS, generateDemoAudioFile, type DemoPreset } from "../lib/demoTracks";
+import { fetchLiveLyrics } from "../lib/lyricsFetcher";
+import { ChartExplorerModal } from "./ChartExplorerModal";
 
 function TerminalExplainer() {
   const [open, setOpen] = useState(false);
@@ -161,19 +164,110 @@ export function ConsolePanel(props: {
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [loadingDemoId, setLoadingDemoId] = useState<string | null>(null);
+  const [isChartOpen, setIsChartOpen] = useState(false);
+  const [fetchingLyrics, setFetchingLyrics] = useState(false);
+  const [lyricsMsg, setLyricsMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const acceptFile = (f: File | undefined | null) => {
     if (!f) return;
     setFile(f);
   };
 
+  const handleAutoFetchLyrics = async () => {
+    const queryTitle = title.trim() || linkInfo?.title || "";
+    const queryArtist = artist.trim() || linkInfo?.artist || "";
+    if (!queryTitle) {
+      setLyricsMsg({ text: "Enter a song title or paste a link first.", ok: false });
+      setTimeout(() => setLyricsMsg(null), 3500);
+      return;
+    }
+
+    setFetchingLyrics(true);
+    setLyricsMsg(null);
+    try {
+      const res = await fetchLiveLyrics(queryTitle, queryArtist);
+      if (res.success && res.lyrics) {
+        setLyrics(res.lyrics);
+        if (!title && res.trackName) setTitle(res.trackName);
+        if (!artist && res.artistName) setArtist(res.artistName);
+        setLyricsMsg({
+          text: `✓ Live lyrics found for "${res.trackName ?? queryTitle}"`,
+          ok: true,
+        });
+      } else {
+        setLyricsMsg({ text: res.error || "No lyrics found online.", ok: false });
+      }
+    } catch (err: any) {
+      setLyricsMsg({ text: err.message || "Failed to fetch live lyrics.", ok: false });
+    } finally {
+      setFetchingLyrics(false);
+      setTimeout(() => setLyricsMsg(null), 4000);
+    }
+  };
+
+  const handleLoadDemo = async (preset: DemoPreset) => {
+    setLoadingDemoId(preset.id);
+    try {
+      setTitle(preset.title);
+      setArtist(preset.artist);
+      setLyrics(preset.lyrics);
+      const audioFile = await generateDemoAudioFile(preset.id);
+      setFile(audioFile);
+    } catch (err) {
+      console.error("Failed to generate demo audio file", err);
+    } finally {
+      setLoadingDemoId(null);
+    }
+  };
+
   const badge = linkInfo ? KIND_BADGE[linkInfo.kind] ?? KIND_BADGE.unsupported : null;
 
   return (
     <div className="panel ticks flex flex-col gap-5 px-5 py-5 sm:px-6">
-      <div>
-        <div className="kicker">Input console</div>
-        <h2 className="font-display text-xl text-ink">Feed the analyzer</h2>
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <div className="kicker">Input console</div>
+          <h2 className="font-display text-xl text-ink">Feed the analyzer</h2>
+        </div>
+      </div>
+
+      {/* 1-Click Demo & Billboard Charts Bar */}
+      <div className="rounded-xl border border-cyanx/30 bg-cyanx/8 p-3.5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+          <span className="font-mono text-[10.5px] font-bold tracking-wider text-cyanx uppercase flex items-center gap-1.5">
+            <span>⚡</span>
+            <span>1-Click Audio Demos & Charts</span>
+          </span>
+          <button
+            onClick={() => setIsChartOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-amber/50 bg-amber/15 px-3 py-1 font-mono text-[10.5px] font-bold text-amber shadow-sm transition hover:bg-amber hover:text-black cursor-pointer"
+          >
+            <span>📊</span>
+            <span>Billboard Hot 100 Charts</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          {DEMO_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleLoadDemo(p)}
+              disabled={loadingDemoId !== null || running}
+              className={`flex items-center gap-2.5 rounded-lg border border-linesoft bg-surface/80 p-2.5 text-left transition hover:border-cyanx hover:bg-surface hover:shadow-sm disabled:opacity-50 cursor-pointer ${
+                title === p.title ? "border-cyanx bg-cyanx/15 shadow-sm shadow-cyanx/10" : ""
+              }`}
+              title={p.description}
+            >
+              <span className="text-xl">{loadingDemoId === p.id ? "⏳" : p.icon}</span>
+              <div className="min-w-0 flex-1">
+                <span className="block truncate font-mono text-xs font-bold text-ink">{p.title}</span>
+                <span className="block truncate font-mono text-[9.5px] text-dim">
+                  {p.genre.split("/")[0]} · {p.bpm} BPM
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* metadata */}
@@ -354,9 +448,18 @@ export function ConsolePanel(props: {
 
       {/* lyrics */}
       <div>
-        <div className="mb-1.5 flex items-center justify-between">
+        <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1">
           <span className="kicker">Lyrics (optional)</span>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleAutoFetchLyrics}
+              disabled={fetchingLyrics || (!title && !linkInfo?.title)}
+              className="inline-flex items-center gap-1 rounded border border-amber/40 bg-amber/10 px-2 py-0.5 font-mono text-[9.5px] font-bold text-amber transition hover:bg-amber hover:text-black disabled:opacity-40 cursor-pointer shadow-sm shadow-amber/10"
+              title="Automatically search and fetch full lyrics online from LRCLIB"
+            >
+              <span>{fetchingLyrics ? "⏳" : "⚡"}</span>
+              <span>{fetchingLyrics ? "Searching..." : "Auto-Find"}</span>
+            </button>
             <button
               onClick={() => setLyrics(SAMPLE_LYRICS)}
               className="font-mono text-[9.5px] tracking-[0.12em] text-cyanx transition hover:text-ink"
@@ -371,11 +474,25 @@ export function ConsolePanel(props: {
             </button>
           </div>
         </div>
+
+        {/* Live Lyrics Fetch Feedback */}
+        {lyricsMsg && (
+          <div
+            className={`mb-2 rounded-lg border px-3 py-1.5 font-mono text-[10px] leading-tight ${
+              lyricsMsg.ok
+                ? "border-mint/50 bg-mint/10 text-mint"
+                : "border-amber/50 bg-amber/10 text-amber"
+            }`}
+          >
+            {lyricsMsg.text}
+          </div>
+        )}
+
         <textarea
           className="input min-h-[140px] resize-y leading-relaxed"
           value={lyrics}
           onChange={(e) => setLyrics(e.target.value)}
-          placeholder={"Paste lyrics here…\nUsed only for metrics — never redisplayed in full."}
+          placeholder={"Paste lyrics here, or click ⚡ Auto-Find to fetch from the web…"}
           spellCheck={false}
         />
         <div className="mt-1 flex items-center justify-between">
@@ -486,6 +603,18 @@ export function ConsolePanel(props: {
           ? "⚠ add a file, a link, or lyrics first — then run analysis"
           : "file / link + lyrics → full report · stream links → embed + text metrics"}
       </p>
+
+      {/* Billboard Hot 100 & Charts Modal */}
+      <ChartExplorerModal
+        isOpen={isChartOpen}
+        onClose={() => setIsChartOpen(false)}
+        onSelectTrack={(t, a, lyr, f) => {
+          setTitle(t);
+          setArtist(a);
+          setLyrics(lyr);
+          setFile(f);
+        }}
+      />
     </div>
   );
 }

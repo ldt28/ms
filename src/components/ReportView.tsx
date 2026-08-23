@@ -3,6 +3,11 @@ import { formatTime, TIER_META, tierColor, type Finding, type ReportData, type T
 import { extractVideoId, useYouTubePlayer, type YouTubeBridge } from "../lib/ytPlayer";
 import { TierBadge, TierLegend, useCountUp, Reveal } from "./ui";
 import { Timeline, labelColor } from "./Timeline";
+import { ExportModal } from "./ExportModal";
+import { HarmonicPanel } from "./HarmonicPanel";
+import { InstrumentMatrixPanel } from "./InstrumentMatrixPanel";
+import { ProducerInsightsPanel } from "./ProducerInsightsPanel";
+import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
   return (
@@ -184,6 +189,8 @@ function PlaybackPanel({ report, ytBridge }: { report: ReportData; ytBridge: You
 
 export function ReportView({ report, audio }: { report: ReportData; audio: HTMLAudioElement | null }) {
   const { meta } = report;
+  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [showFullLyrics, setShowFullLyrics] = useState(false);
 
   // YouTube instrumented-player bridge: real duration + synced time + seek
   const [yt, setYt] = useState<{ duration: number | null; time: number }>({ duration: null, time: 0 });
@@ -227,7 +234,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
   const meanEnergyPct = report.energy ? Math.round(report.energy.avg * 100) : null;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="signal-printable-report flex flex-col gap-5">
       {/* report header */}
       <Reveal>
         <div className="panel ticks overflow-hidden px-5 py-5 sm:px-7">
@@ -242,7 +249,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
               </h2>
               <div className="mt-1 text-sm font-medium text-dim">{meta.artist}</div>
             </div>
-            <div className="flex items-start gap-3">
+            <div className="flex flex-col sm:flex-row items-end sm:items-start gap-3">
               <div className="flex flex-wrap justify-end gap-1.5">
                 <span
                   className={`rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.14em] ${
@@ -271,6 +278,13 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                     </span>
                   ))}
               </div>
+              <button
+                onClick={() => setIsExportOpen(true)}
+                className="hide-on-print flex items-center gap-1.5 rounded-full border border-cyanx/50 bg-cyanx/10 px-3.5 py-1 font-mono text-[11px] font-bold tracking-wide text-cyanx shadow-sm transition hover:border-cyanx hover:bg-cyanx hover:text-black cursor-pointer"
+                title="Export report as PDF, JSON, Markdown, or Social Track Card image"
+              >
+                <span>⤹</span> Export & Share
+              </button>
               {meta.source.thumbnail && (
                 <img
                   src={meta.source.thumbnail}
@@ -464,11 +478,43 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         </Reveal>
       )}
 
+      {/* Harmonic & Chord Progression Breakdown */}
+      {(() => {
+        const effectiveHarmonics =
+          report.harmonics ??
+          (report.keySig?.value
+            ? analyzeHarmonics(
+                report.keySig.value,
+                report.sections,
+                report.tempo?.value ?? null,
+                report.meta.durationSec ?? null
+              )
+            : null);
+        return effectiveHarmonics ? (
+          <Reveal delay={50}>
+            <HarmonicPanel
+              harmonics={effectiveHarmonics}
+              onSeek={(t) => {
+                if (audio) {
+                  audio.currentTime = t;
+                  void audio.play().catch(() => undefined);
+                }
+              }}
+            />
+          </Reveal>
+        ) : null;
+      })()}
+
+      {/* Instrument & Stem Recognition */}
+      <Reveal delay={55}>
+        <InstrumentMatrixPanel report={report} />
+      </Reveal>
+
       {/* lyrics */}
       <Reveal delay={60}>
         <div className="panel px-5 py-5 sm:px-6">
           <PanelHeader
-            kicker="04 · Lyrics"
+            kicker="05 · Lyrics"
             title={report.lyrics ? "Text metrics" : "Lyrics"}
             right={
               report.lyrics ? (
@@ -537,19 +583,39 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                     misheard words. The transcript is in the lyrics box: clean it up and re-run for sharper metrics.
                   </p>
                 )}
-                <p className="mt-3 font-mono text-[9.5px] leading-relaxed text-faint">
-                  Full lyrics are never redisplayed by Signal — only short repeated fragments, per the product rule.
-                </p>
+
+                {/* Collapsible Full Lyrics Reader */}
+                {report.lyrics.rawText && (
+                  <div className="mt-4 border-t border-linesoft/60 pt-3">
+                    <button
+                      onClick={() => setShowFullLyrics(!showFullLyrics)}
+                      className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-cyanx hover:text-ink transition cursor-pointer"
+                    >
+                      <span>{showFullLyrics ? "▼ Hide Full Lyrics Text" : "▶ Read Full Song Lyrics"}</span>
+                      <span className="text-dim">({report.lyrics.lineCount} lines · {report.lyrics.wordCount} words)</span>
+                    </button>
+                    {showFullLyrics && (
+                      <div className="mt-3 max-h-80 overflow-y-auto rounded-xl border border-linesoft bg-pit/90 p-4 font-mono text-xs text-ink/90 whitespace-pre-wrap leading-relaxed">
+                        {report.lyrics.rawText}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </>
           )}
         </div>
       </Reveal>
 
+      {/* AI Producer & Mix Feedback */}
+      <Reveal delay={55}>
+        <ProducerInsightsPanel report={report} />
+      </Reveal>
+
       {/* provenance */}
       <Reveal delay={60}>
         <div className="panel ticks px-5 py-5 sm:px-6">
-          <PanelHeader kicker="05 · Provenance" title="How each number was produced" />
+          <PanelHeader kicker="07 · Provenance" title="How each number was produced" />
           <div className="mb-4 flex flex-wrap gap-2">
             {(Object.keys(tally) as Tier[]).map((t) => (
               <span
@@ -564,6 +630,13 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           <TierLegend />
         </div>
       </Reveal>
+
+      {/* Export & Share Modal */}
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        report={report}
+      />
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { formatTime, type ReportData, type Section } from "../lib/types";
 import { TierBadge, useReducedMotion } from "./ui";
+import { SpectrumVisualizer } from "./SpectrumVisualizer";
+import { ChordTrack } from "./ChordTrack";
+import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 export function labelColor(label: string): string {
   const l = label.toLowerCase();
@@ -108,6 +111,9 @@ export function Timeline({
 
   return (
     <div>
+      {/* 60 FPS Real-time Spectrum & Parametric EQ */}
+      <SpectrumVisualizer audio={audio} isPlaying={playing} className="mb-4" />
+
       {/* timeline body */}
       <div
         ref={bodyRef}
@@ -238,6 +244,23 @@ export function Timeline({
           )}
         </div>
       </div>
+
+      {/* Chord Progression Track */}
+      {(() => {
+        const effectiveHarmonics =
+          report.harmonics ??
+          (report.keySig?.value
+            ? analyzeHarmonics(report.keySig.value, sections, report.tempo?.value ?? null, duration)
+            : null);
+        return effectiveHarmonics ? (
+          <ChordTrack
+            harmonics={effectiveHarmonics}
+            duration={duration}
+            playTime={playTime}
+            onSeek={seekTo}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

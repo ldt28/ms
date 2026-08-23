@@ -39,6 +39,7 @@ export interface LyricsBlock {
   avgSyllPerLine: Finding<number>;
   flow: Finding<number | null>; // syllables per second (needs duration)
   hooks: Hook[];
+  rawText?: string;
 }
 
 export interface ReportSource {
@@ -51,6 +52,70 @@ export interface ReportSource {
   /** playable official embed (YouTube / Spotify / SoundCloud) */
   embedUrl?: string;
   note?: string | null;
+}
+
+export interface ChordEvent {
+  start: number;
+  end: number;
+  root: string; // e.g. "Bb", "F", "Db"
+  quality: "maj" | "min" | "7" | "maj7" | "min7" | "dim" | "sus4";
+  name: string; // e.g. "Bbm", "Gb", "Db", "Ab"
+  roman: string; // e.g. "i", "VI", "III", "VII"
+  notes: string[]; // e.g. ["Bb", "Db", "F"]
+  confidence: number; // 0..1
+}
+
+export interface SectionHarmony {
+  sectionLabel: string;
+  start: number;
+  end: number;
+  progression: string[]; // e.g. ["Bbm", "Gb", "Db", "Ab"]
+  romanProgression: string; // e.g. "i – VI – III – VII"
+  patternName?: string; // e.g. "Aeolian 4-Chord Loop"
+  chords: ChordEvent[];
+}
+
+export interface HarmonicBreakdown {
+  key: string; // e.g. "Bb minor"
+  scaleType: "minor" | "major" | "dorian" | "mixolydian";
+  camelot: string; // e.g. "3A"
+  relativeKey: string; // e.g. "Db major (3B)"
+  dominantCadence: string; // e.g. "F7 -> Bbm (V - i)"
+  progressionSummary: string; // e.g. "i – VI – III – VII"
+  patternArchetype?: string; // e.g. "Modern Pop Minor Loop"
+  sections: SectionHarmony[];
+  overallChords: ChordEvent[];
+}
+
+export type InstrumentId = "drums" | "bass" | "keys" | "guitars" | "synths" | "strings" | "vocals";
+
+export interface InstrumentInfo {
+  id: InstrumentId;
+  name: string;
+  icon: string;
+  category: "Rhythm" | "Harmonic" | "Melodic" | "Vocal";
+  freqRange: string; // e.g. "30 Hz – 180 Hz"
+  confidencePct: number; // 0..100
+  mixSharePct: number; // 0..100
+  detected: boolean;
+  timbreDescription: string;
+}
+
+export interface SectionInstruments {
+  sectionLabel: string;
+  start: number;
+  end: number;
+  activeInstruments: InstrumentId[];
+  density: number; // count of active instruments
+  layeringDescription: string;
+}
+
+export interface InstrumentBreakdown {
+  dominantFamily: string;
+  detectedCount: number;
+  instruments: InstrumentInfo[];
+  sectionMatrix: SectionInstruments[];
+  arrangementPacing: string;
 }
 
 export interface ReportData {
@@ -79,6 +144,8 @@ export interface ReportData {
     onsetRate: Finding<number>;
   } | null;
   sections: Section[];
+  harmonics?: HarmonicBreakdown | null;
+  instruments?: InstrumentBreakdown | null;
   lyrics: LyricsBlock | null;
   audioError: string | null;
   /** Informational, by-design limitation (e.g. official embed, no stream decoding) — not a failure. */

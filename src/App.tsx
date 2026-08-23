@@ -2,28 +2,34 @@ import { useEffect, useRef, useState } from "react";
 import type { LyricsBlock, PingState, ReportData, ReportSource } from "./lib/types";
 import { analyzeAudioFile, AnalysisError, type AudioAnalysisResult } from "./lib/audioEngine";
 import { analyzeLyrics } from "./lib/lyricsEngine";
+import { analyzeHarmonics } from "./lib/harmonicEngine";
+import { detectInstruments } from "./lib/instrumentEngine";
 import { ensureLyricLines, transcribeAudioBuffer, TranscribeError } from "./lib/transcribe";
 import { postToBackend } from "./lib/backend";
 import { resolveLink, type LinkInfo } from "./lib/linkResolver";
 import { ConsolePanel, type EngineMode, type LinkStatus } from "./components/ConsolePanel";
 import { ReportView } from "./components/ReportView";
 import { Roadmap } from "./components/Roadmap";
+import { GenreLab } from "./components/GenreLab";
 import { EqBars, FlatlineBlip, Reveal, Scope, useReducedMotion } from "./components/ui";
 
 const BROWSER_PLAN = [
   "Reading file",
-  "Decoding audio",
-  "Scanning levels & bands",
-  "Estimating tempo (onset autocorrelation)",
-  "Building chromagram",
-  "Detecting section boundaries",
-  "Scoring lyrics",
+  "Decoding audio (Web Audio API)",
+  "Energy curve & dynamic range",
+  "Tempo & beat grid (autocorrelation)",
+  "Key signature (chroma correlation)",
+  "Harmonic progression & Camelot Wheel",
+  "Instrument & stem detection",
+  "Section boundary detection",
+  "Lyrics & rhyme metrics",
+  "AI Producer scorecard",
   "Assembling report",
 ];
 const BACKEND_PLAN = ["Contacting backend", "Awaiting report", "Rendering"];
 
 type Status = "idle" | "running" | "done";
-type Tab = "bench" | "plan";
+type Tab = "bench" | "genres" | "plan";
 
 function loadStr(key: string, fallback: string): string {
   try {
@@ -267,7 +273,15 @@ export default function App() {
       warnings.push(linkInfo.note);
     }
 
-    return {
+    const effectiveKey = audio?.keySig?.value || "C major";
+    const harmonics = analyzeHarmonics(
+      effectiveKey,
+      audio?.sections ?? [],
+      audio?.tempo?.value ?? null,
+      audio?.durationSec ?? null
+    );
+
+    const baseReport: ReportData = {
       meta: {
         title: title.trim() || linkInfo?.title || "Untitled track",
         artist: artist.trim() || linkInfo?.artist || "Unknown artist",
@@ -284,6 +298,7 @@ export default function App() {
       energy: audio?.energy ?? null,
       texture: audio?.texture ?? null,
       sections: audio?.sections ?? [],
+      harmonics,
       lyrics: lyricsBlock,
       audioError,
       audioNote,
@@ -292,6 +307,9 @@ export default function App() {
       warnings,
       audioUrl: linkInfo?.kind === "direct" ? linkInfo.url : null,
     };
+
+    baseReport.instruments = detectInstruments(baseReport);
+    return baseReport;
   };
 
   const runAnalysis = async () => {
@@ -378,6 +396,7 @@ export default function App() {
             {(
               [
                 { id: "bench", label: "WORKBENCH" },
+                { id: "genres", label: "GENRE LAB" },
                 { id: "plan", label: "BUILD PLAN" },
               ] as { id: Tab; label: string }[]
             ).map((t) => (
@@ -414,6 +433,16 @@ export default function App() {
       <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8">
         {tab === "plan" ? (
           <Roadmap />
+        ) : tab === "genres" ? (
+          <GenreLab
+            onLoadTemplateToWorkbench={(t, a, lyr, f) => {
+              setTitle(t);
+              setArtist(a);
+              setLyrics(lyr);
+              setFileExclusive(f);
+              setTab("bench");
+            }}
+          />
         ) : (
           <div className="grid items-start gap-5 lg:grid-cols-[400px_minmax(0,1fr)]">
             <div className="lg:sticky lg:top-6">

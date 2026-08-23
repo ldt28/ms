@@ -126,5 +126,6 @@ export function analyzeLyrics(
       note: flowValue === null ? "Needs an audio duration." : undefined,
     },
     hooks,
+    rawText: text,
   };
 }
