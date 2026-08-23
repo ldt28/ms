@@ -419,13 +419,30 @@ export default function App() {
     }
   };
 
+  const [studioTheme, setStudioTheme] = useState<"cyber" | "logic" | "holo" | "analog">(() => {
+    try {
+      return (localStorage.getItem("signal_studio_theme") as "cyber" | "logic" | "holo" | "analog") || "cyber";
+    } catch {
+      return "cyber";
+    }
+  });
+
+  const handleSelectTheme = (thm: "cyber" | "logic" | "holo" | "analog") => {
+    setStudioTheme(thm);
+    try {
+      localStorage.setItem("signal_studio_theme", thm);
+    } catch {
+      // ignore
+    }
+  };
+
   const stageIdx = plan.indexOf(stage);
 
   return (
-    <div className="relative z-10 min-h-screen">
+    <div className={`relative z-10 min-h-screen theme-${studioTheme}`}>
       {/* ---------- header ---------- */}
-      <header className="border-b border-line bg-panel/70 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-x-6 gap-y-3 px-4 py-3.5 sm:px-6">
+      <header className="border-b border-line bg-panel/70 backdrop-blur-md">
+        <div className="mx-auto flex max-w-[1640px] flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3.5 sm:px-6">
           <div className="flex items-center gap-3">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-amber/50 bg-pit">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="#f0a63f" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -434,11 +451,11 @@ export default function App() {
             </span>
             <div>
               <div className="font-display text-lg leading-none tracking-wide text-ink">SIGNAL</div>
-              <div className="mt-0.5 font-mono text-[9px] tracking-[0.28em] text-dim">SONG BREAKDOWN · MVP 0.2</div>
+              <div className="mt-0.5 font-mono text-[9px] tracking-[0.28em] text-dim">SONG BREAKDOWN · DAW STUDIO PRO</div>
             </div>
           </div>
 
-          <nav className="order-3 flex w-full gap-1 sm:order-none sm:ml-6 sm:w-auto">
+          <nav className="order-3 flex w-full gap-1 sm:order-none sm:w-auto">
             {(
               [
                 { id: "bench", label: "WORKBENCH" },
@@ -449,7 +466,7 @@ export default function App() {
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
-                className={`relative rounded-md px-3.5 py-2 font-mono text-[11px] font-semibold tracking-[0.16em] transition-colors ${
+                className={`relative rounded-md px-3.5 py-2 font-mono text-[11px] font-semibold tracking-[0.16em] transition-colors cursor-pointer ${
                   tab === t.id ? "text-amber" : "text-dim hover:text-ink"
                 }`}
               >
@@ -463,13 +480,38 @@ export default function App() {
             ))}
           </nav>
 
-          <div className="ml-auto flex items-center gap-2 rounded-full border border-line bg-pit px-3 py-1.5">
-            <span
-              className={`pulse-dot h-2 w-2 rounded-full ${engine === "browser" ? "bg-mint text-mint" : "bg-cyanx text-cyanx"}`}
-            />
-            <span className="max-w-[220px] truncate font-mono text-[9.5px] font-semibold tracking-[0.16em] text-dim">
-              {engine === "browser" ? "ENGINE · BROWSER DSP" : `ENGINE · ${endpoint.replace(/^https?:\/\//, "").toUpperCase()}`}
-            </span>
+          {/* Theme Switcher & Engine Badge */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-1 rounded-lg border border-line bg-pit/80 p-1 shadow-inner">
+              <span className="font-mono text-[9px] font-bold text-faint px-1.5 hidden xl:inline">THEME</span>
+              {[
+                { id: "cyber", label: "🎛️ Cyber-DAW" },
+                { id: "logic", label: "🍎 Logic Pro" },
+                { id: "holo", label: "🌌 Holographic" },
+                { id: "analog", label: "📻 Analog" },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => handleSelectTheme(t.id as "cyber" | "logic" | "holo" | "analog")}
+                  className={`rounded px-2 py-1 font-mono text-[10px] font-bold transition cursor-pointer ${
+                    studioTheme === t.id
+                      ? "bg-amber text-black shadow-xs shadow-amber"
+                      : "text-dim hover:text-ink hover:bg-surface/50"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="hidden sm:flex items-center gap-2 rounded-full border border-line bg-pit px-3 py-1.5">
+              <span
+                className={`pulse-dot h-2 w-2 rounded-full ${engine === "browser" ? "bg-mint text-mint" : "bg-cyanx text-cyanx"}`}
+              />
+              <span className="max-w-[180px] truncate font-mono text-[9.5px] font-semibold tracking-[0.16em] text-dim">
+                {engine === "browser" ? "BROWSER DSP" : endpoint.replace(/^https?:\/\//, "").toUpperCase()}
+              </span>
+            </div>
           </div>
         </div>
         <Scope className="h-9 border-t border-linesoft bg-pit/50" />

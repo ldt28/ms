@@ -5,21 +5,78 @@
   --font-body: "Instrument Sans", "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
 
-  --color-bg: #0f131a;
-  --color-pit: #0b0e14;
-  --color-panel: #151a23;
-  --color-raise: #1b212d;
-  --color-line: #27303f;
-  --color-linesoft: #1f2632;
-  --color-ink: #e9e4d6;
-  --color-dim: #93a0b4;
-  --color-faint: #5c6778;
+  --color-bg: #0b0e14;
+  --color-pit: #080a0f;
+  --color-panel: #131722;
+  --color-raise: #1a202e;
+  --color-line: #262e3d;
+  --color-linesoft: #1c232f;
+  --color-ink: #f0ede6;
+  --color-dim: #94a3b8;
+  --color-faint: #5a6679;
   --color-amber: #f0a63f;
   --color-amberhot: #ffc069;
-  --color-mint: #45d498;
-  --color-cyanx: #58c7d8;
-  --color-rosex: #e56a54;
+  --color-mint: #00ff9d;
+  --color-cyanx: #00f0ff;
+  --color-rosex: #ff2a85;
   --color-slatex: #8b95a9;
+}
+
+/* ---------- Theme Overrides ---------- */
+
+/* 1. Cyber-DAW Pro Glass (Default) */
+.theme-cyber {
+  --color-bg: #090c12;
+  --color-pit: #05070a;
+  --color-panel: rgba(18, 23, 34, 0.82);
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-linesoft: rgba(255, 255, 255, 0.05);
+  --color-amber: #ffaa00;
+  --color-cyanx: #00f0ff;
+  --color-mint: #00ff9d;
+  --color-rosex: #ff2a85;
+}
+
+/* 2. Apple Logic / Teenage Engineering */
+.theme-logic {
+  --color-bg: #111317;
+  --color-pit: #0c0e11;
+  --color-panel: #171a20;
+  --color-line: #2a303c;
+  --color-linesoft: #1f232b;
+  --color-amber: #ff5500;
+  --color-cyanx: #38bdf8;
+  --color-mint: #22c55e;
+  --color-rosex: #ef4444;
+}
+
+/* 3. Holographic Cyber-Stage */
+.theme-holo {
+  --color-bg: #06070c;
+  --color-pit: #030408;
+  --color-panel: rgba(20, 16, 32, 0.85);
+  --color-line: rgba(168, 85, 247, 0.25);
+  --color-linesoft: rgba(168, 85, 247, 0.12);
+  --color-amber: #c084fc;
+  --color-cyanx: #06b6d4;
+  --color-mint: #34d399;
+  --color-rosex: #f43f5e;
+}
+
+/* 4. Retro Analog Console */
+.theme-analog {
+  --color-bg: #141210;
+  --color-pit: #0d0c0b;
+  --color-panel: #1e1b18;
+  --color-line: #3d3630;
+  --color-linesoft: #292420;
+  --color-ink: #fef3c7;
+  --color-dim: #a8a29e;
+  --color-faint: #78716c;
+  --color-amber: #f59e0b;
+  --color-cyanx: #d97706;
+  --color-mint: #84cc16;
+  --color-rosex: #dc2626;
 }
 
 html {
@@ -34,12 +91,13 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   background-image:
-    radial-gradient(1100px 520px at 88% -12%, rgba(240, 166, 63, 0.075), transparent 62%),
-    radial-gradient(950px 620px at -12% 108%, rgba(88, 199, 216, 0.06), transparent 60%),
-    linear-gradient(rgba(233, 228, 214, 0.026) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(233, 228, 214, 0.026) 1px, transparent 1px);
+    radial-gradient(1100px 520px at 88% -12%, rgba(240, 166, 63, 0.08), transparent 62%),
+    radial-gradient(950px 620px at -12% 108%, rgba(0, 240, 255, 0.06), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
   background-size: auto, auto, 46px 46px, 46px 46px;
   background-attachment: fixed;
+  transition: background-color 300ms ease, color 300ms ease;
 }
 
 /* film-grain overlay */
