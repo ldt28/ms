@@ -490,34 +490,36 @@ export default function App() {
             }}
           />
         ) : (
-          <div className="grid items-start gap-4 xl:grid-cols-[340px_minmax(0,1fr)_360px] lg:grid-cols-[280px_minmax(0,1fr)_340px]">
-            {/* 1. Far Left Column: Dedicated Time-Synced Lyrics Studio */}
-            <div className="order-1">
-              <DedicatedLyricsColumn
-                lyrics={
-                  report?.lyrics ??
-                  (lyrics.trim()
-                    ? {
-                        source: "pasted",
-                        wordCount: lyrics.split(/\s+/).filter(Boolean).length,
-                        lineCount: lyrics.split(/\r?\n/).filter(Boolean).length,
-                        rhymeDensity: { value: 0.65, tier: "computed", source: "heuristic" },
-                        diversity: { value: 0.72, tier: "computed", source: "TTR" },
-                        avgSyllPerLine: { value: 8.5, tier: "computed", source: "heuristic" },
-                        flow: { value: 3.2, tier: "computed", source: "syl/s" },
-                        hooks: [],
-                        rawText: lyrics,
-                        syncedLines: parseSyncedLyrics(lyrics, report?.meta.durationSec || 180),
-                        geniusUrl: `https://genius.com/search?q=${encodeURIComponent(`${title} ${artist}`.trim())}`,
-                      }
-                    : null)
-                }
-                currentTime={audioTime}
-                duration={report?.meta.durationSec || 180}
-                isPlaying={audioPlaying}
-                onSeek={handleAppSeek}
-                title={title || report?.meta.title}
-                artist={artist || report?.meta.artist}
+          <div className="grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)_340px] lg:grid-cols-[320px_minmax(0,1fr)_300px]">
+            {/* 1. Left Column: Feed the Analyzer / Input Console */}
+            <div className="lg:sticky lg:top-6 order-1">
+              <ConsolePanel
+                title={title}
+                setTitle={setTitle}
+                artist={artist}
+                setArtist={setArtist}
+                file={file}
+                setFile={setFileExclusive}
+                lyrics={lyrics}
+                setLyrics={setLyrics}
+                transcribe={transcribe}
+                setTranscribe={setTranscribe}
+                engine={engine}
+                setEngine={setEngine}
+                endpoint={endpoint}
+                setEndpoint={setEndpoint}
+                ping={ping}
+                canRun={canRun}
+                running={status === "running"}
+                onAnalyze={runAnalysis}
+                linkUrl={linkUrl}
+                setLinkUrl={setLinkUrl}
+                linkStatus={linkStatus}
+                linkError={linkError}
+                linkInfo={linkInfo}
+                onLoadLink={handleLoadLink}
+                onClearLink={handleClearLink}
+                onPasteLink={handlePasteLink}
               />
             </div>
 
@@ -588,7 +590,7 @@ export default function App() {
                       <span className="cursor-blink ml-2 inline-block h-[0.72em] w-[0.45em] translate-y-[0.08em] bg-amber/80" />
                     </h2>
                     <p className="mt-4 max-w-xl text-sm leading-relaxed text-dim">
-                      Select a song or drop a track in the console on the right. The live time-synced lyrics will appear on the left, and the full multi-track DAW breakdown and pattern sequencer will render here in the center.
+                      Select a song or drop a track in the console on the left. The full multi-track DAW breakdown and pattern sequencer will render here in the center, and live time-synced lyrics will scroll on the right.
                     </p>
 
                     <div className="mt-6">
@@ -597,9 +599,9 @@ export default function App() {
 
                     <ol className="mt-8 flex flex-col gap-3">
                       {[
-                        ["01", "Select a Hit or Paste Link", "Choose any Billboard Hot 100 hit, audio demo, YouTube, Spotify or SoundCloud link on the right."],
-                        ["02", "Live Synced Lyrics Studio", "The left column indexes exact line & hook start times, section headers, and auto-scrolls live."],
-                        ["03", "Full DAW Arrangement & Pattern Map", "Inspect granular drum, chord, key, synth, and string patterns across the full song duration."],
+                        ["01", "Select a Hit or Paste Link", "Choose any Billboard Hot 100 hit, audio demo, YouTube, Spotify or SoundCloud link on the left."],
+                        ["02", "Full DAW Arrangement & Pattern Map", "Inspect granular drum, chord, key, synth, and string patterns across the full song duration in the center."],
+                        ["03", "Live Synced Lyrics Studio", "The right column indexes exact line & hook start times, section headers, and auto-scrolls live."],
                       ].map(([n, t, d]) => (
                         <li key={n} className="group flex gap-4 rounded-lg border border-linesoft bg-pit/60 px-4 py-3 transition-colors hover:border-amber/40">
                           <span className="font-mono text-[11px] font-bold tracking-[0.2em] text-amber">{n}</span>
@@ -615,35 +617,33 @@ export default function App() {
               )}
             </div>
 
-            {/* 3. Far Right Column: Feed the Analyzer / Input Console */}
-            <div className="lg:sticky lg:top-6 order-3">
-              <ConsolePanel
-                title={title}
-                setTitle={setTitle}
-                artist={artist}
-                setArtist={setArtist}
-                file={file}
-                setFile={setFileExclusive}
-                lyrics={lyrics}
-                setLyrics={setLyrics}
-                transcribe={transcribe}
-                setTranscribe={setTranscribe}
-                engine={engine}
-                setEngine={setEngine}
-                endpoint={endpoint}
-                setEndpoint={setEndpoint}
-                ping={ping}
-                canRun={canRun}
-                running={status === "running"}
-                onAnalyze={runAnalysis}
-                linkUrl={linkUrl}
-                setLinkUrl={setLinkUrl}
-                linkStatus={linkStatus}
-                linkError={linkError}
-                linkInfo={linkInfo}
-                onLoadLink={handleLoadLink}
-                onClearLink={handleClearLink}
-                onPasteLink={handlePasteLink}
+            {/* 3. Right Column: Dedicated Time-Synced Lyrics Studio */}
+            <div className="order-3">
+              <DedicatedLyricsColumn
+                lyrics={
+                  report?.lyrics ??
+                  (lyrics.trim()
+                    ? {
+                        source: "pasted",
+                        wordCount: lyrics.split(/\s+/).filter(Boolean).length,
+                        lineCount: lyrics.split(/\r?\n/).filter(Boolean).length,
+                        rhymeDensity: { value: 0.65, tier: "computed", source: "heuristic" },
+                        diversity: { value: 0.72, tier: "computed", source: "TTR" },
+                        avgSyllPerLine: { value: 8.5, tier: "computed", source: "heuristic" },
+                        flow: { value: 3.2, tier: "computed", source: "syl/s" },
+                        hooks: [],
+                        rawText: lyrics,
+                        syncedLines: parseSyncedLyrics(lyrics, report?.meta.durationSec || 180),
+                        geniusUrl: `https://genius.com/search?q=${encodeURIComponent(`${title} ${artist}`.trim())}`,
+                      }
+                    : null)
+                }
+                currentTime={audioTime}
+                duration={report?.meta.durationSec || 180}
+                isPlaying={audioPlaying}
+                onSeek={handleAppSeek}
+                title={title || report?.meta.title}
+                artist={artist || report?.meta.artist}
               />
             </div>
           </div>
