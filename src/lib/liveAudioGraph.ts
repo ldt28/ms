@@ -187,6 +187,12 @@ class LiveAudioGraphController {
     }
   }
 
+  public setBands(bands: EqBands) {
+    (Object.keys(bands) as (keyof EqBands)[]).forEach((b) => {
+      this.setBand(b, bands[b]);
+    });
+  }
+
   public applyPreset(presetKey: EqPresetKey) {
     const preset = EQ_PRESETS[presetKey];
     if (!preset) return;

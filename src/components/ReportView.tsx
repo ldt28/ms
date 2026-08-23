@@ -9,6 +9,13 @@ import { InstrumentMatrixPanel } from "./InstrumentMatrixPanel";
 import { ProducerInsightsPanel } from "./ProducerInsightsPanel";
 import { FullSongDAWMap } from "./FullSongDAWMap";
 import { FLStudioChannelRack } from "./FLStudioChannelRack";
+import { StreamingCompliancePanel } from "./StreamingCompliancePanel";
+import { ReferenceMatcherModal } from "./ReferenceMatcherModal";
+import { SampleAncestryPanel } from "./SampleAncestryPanel";
+import { ArtistDeepDivePanel } from "./ArtistDeepDivePanel";
+import { HarmonicDJAssistant } from "./HarmonicDJAssistant";
+import { VocalPitchHUD } from "./VocalPitchHUD";
+import { AnimatedSocialExportModal } from "./AnimatedSocialExportModal";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -192,6 +199,8 @@ function PlaybackPanel({ report, ytBridge }: { report: ReportData; ytBridge: You
 export function ReportView({ report, audio }: { report: ReportData; audio: HTMLAudioElement | null }) {
   const { meta } = report;
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isRefMatcherOpen, setIsRefMatcherOpen] = useState(false);
+  const [isSocialExportOpen, setIsSocialExportOpen] = useState(false);
   const [showFullLyrics, setShowFullLyrics] = useState(false);
   const [audioTime, setAudioTime] = useState(0);
   const [audioPlaying, setAudioPlaying] = useState(false);
@@ -344,13 +353,29 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                     </span>
                   ))}
               </div>
-              <button
-                onClick={() => setIsExportOpen(true)}
-                className="hide-on-print flex items-center gap-1.5 rounded-full border border-cyanx/50 bg-cyanx/10 px-3.5 py-1 font-mono text-[11px] font-bold tracking-wide text-cyanx shadow-sm transition hover:border-cyanx hover:bg-cyanx hover:text-black cursor-pointer"
-                title="Export report as PDF, JSON, Markdown, or Social Track Card image"
-              >
-                <span>⤹</span> Export & Share
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setIsRefMatcherOpen(true)}
+                  className="hide-on-print flex items-center gap-1.5 rounded-full border border-amber/60 bg-amber/15 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-amber shadow-sm transition hover:bg-amber hover:text-black cursor-pointer"
+                  title="A/B Compare with Commercial Hits & Generate Match EQ"
+                >
+                  <span>🎚️</span> Match EQ
+                </button>
+                <button
+                  onClick={() => setIsSocialExportOpen(true)}
+                  className="hide-on-print flex items-center gap-1.5 rounded-full border border-mint/60 bg-mint/15 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-mint shadow-sm transition hover:bg-mint hover:text-black cursor-pointer"
+                  title="Export 9:16 Animated 3D Video for TikTok / Reels"
+                >
+                  <span>📱</span> 9:16 Video
+                </button>
+                <button
+                  onClick={() => setIsExportOpen(true)}
+                  className="hide-on-print flex items-center gap-1.5 rounded-full border border-cyanx/50 bg-cyanx/10 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-cyanx shadow-sm transition hover:border-cyanx hover:bg-cyanx hover:text-black cursor-pointer"
+                  title="Export report as PDF, JSON, Markdown, or Social Track Card image"
+                >
+                  <span>⤹</span> Export
+                </button>
+              </div>
               {meta.source.thumbnail && (
                 <img
                   src={meta.source.thumbnail}
@@ -699,8 +724,33 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         <ProducerInsightsPanel report={report} />
       </Reveal>
 
-      {/* provenance */}
+      {/* Streaming Platform Loudness & True-Peak Radar */}
+      <Reveal delay={57}>
+        <StreamingCompliancePanel report={report} />
+      </Reveal>
+
+      {/* Live Vocal Pitch & Melodyne HUD */}
+      <Reveal delay={58}>
+        <VocalPitchHUD report={report} currentTime={currentPlaybackTime} isPlaying={isPlaybackPlaying} />
+      </Reveal>
+
+      {/* Harmonic Camelot DJ Mix Assistant & Playlist Generator */}
+      <Reveal delay={59}>
+        <HarmonicDJAssistant report={report} />
+      </Reveal>
+
+      {/* Sample Ancestry & Interpolation Lineage Tree */}
       <Reveal delay={60}>
+        <SampleAncestryPanel report={report} />
+      </Reveal>
+
+      {/* Artist Deep-Dive & Discography Card */}
+      <Reveal delay={61}>
+        <ArtistDeepDivePanel report={report} />
+      </Reveal>
+
+      {/* provenance */}
+      <Reveal delay={62}>
         <div className="panel ticks px-5 py-5 sm:px-6">
           <PanelHeader kicker="07 · Provenance" title="How each number was produced" />
           <div className="mb-4 flex flex-wrap gap-2">
@@ -718,11 +768,24 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         </div>
       </Reveal>
 
-      {/* Export & Share Modal */}
+      {/* Modals */}
       <ExportModal
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         report={report}
+      />
+
+      <ReferenceMatcherModal
+        isOpen={isRefMatcherOpen}
+        onClose={() => setIsRefMatcherOpen(false)}
+        report={report}
+      />
+
+      <AnimatedSocialExportModal
+        isOpen={isSocialExportOpen}
+        onClose={() => setIsSocialExportOpen(false)}
+        report={report}
+        currentTime={currentPlaybackTime}
       />
     </div>
   );
