@@ -589,6 +589,9 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           bpm={effectiveTempo.value || 120}
           instruments={report.instruments}
           report={report}
+          sections={effectiveSections}
+          onTogglePlay={handleTogglePlay}
+          onSeek={handleSeek}
         />
       </Reveal>
 
