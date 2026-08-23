@@ -476,7 +476,7 @@ export default function App() {
       </header>
 
       {/* ---------- body ---------- */}
-      <main className="mx-auto max-w-[1440px] px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-[1640px] px-4 py-6 sm:px-6 sm:py-8">
         {tab === "plan" ? (
           <Roadmap />
         ) : tab === "genres" ? (
@@ -490,7 +490,7 @@ export default function App() {
             }}
           />
         ) : (
-          <div className="grid items-start gap-4 xl:grid-cols-[360px_minmax(0,1fr)_340px] lg:grid-cols-[320px_minmax(0,1fr)_300px]">
+          <div className="grid items-start gap-5 2xl:grid-cols-[360px_minmax(0,1fr)_460px] xl:grid-cols-[330px_minmax(0,1fr)_420px] lg:grid-cols-[300px_minmax(0,1fr)_350px]">
             {/* 1. Left Column: Feed the Analyzer / Input Console */}
             <div className="lg:sticky lg:top-6 order-1">
               <ConsolePanel
