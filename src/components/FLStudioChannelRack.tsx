@@ -439,32 +439,35 @@ export function FLStudioChannelRack({
         </div>
       </div>
 
-      <div className="hidden sm:flex items-center gap-2.5 px-4 py-1.5 bg-[#090b12] border-b border-white/5 text-[9.5px] text-faint">
-        <div className="w-52 shrink-0 font-bold uppercase tracking-wider text-cyanx/80">
-          Instrument Stems ({filteredChannels.length})
-        </div>
-        <div className="w-14 shrink-0 text-center">Peak VU</div>
-        <div className="flex-1 grid grid-cols-16 gap-1 text-center font-bold relative">
-          {[...Array(16)].map((_, i) => (
-            <span
-              key={i}
-              className={`transition-colors duration-75 ${
-                activeStep === i && isMasterPlaying
-                  ? "text-white font-black scale-125 drop-shadow-[0_0_8px_#fff]"
-                  : i % 4 === 0
-                  ? "text-amber font-extrabold"
-                  : "text-faint/60"
-              }`}
-            >
-              {i % 4 === 0 ? `B${Math.floor(i / 4) + 1}` : i + 1}
-            </span>
-          ))}
-        </div>
-      </div>
+      {/* Contained Horizontal Scroll Container for Stem Tracks & 16-Step Grid */}
+      <div className="overflow-x-auto min-w-0">
+        <div className="min-w-[660px]">
+          <div className="hidden sm:flex items-center gap-2.5 px-4 py-1.5 bg-[#090b12] border-b border-white/5 text-[9.5px] text-faint">
+            <div className="w-52 shrink-0 font-bold uppercase tracking-wider text-cyanx/80">
+              Instrument Stems ({filteredChannels.length})
+            </div>
+            <div className="w-14 shrink-0 text-center">Peak VU</div>
+            <div className="flex-1 grid grid-cols-16 gap-1 text-center font-bold relative">
+              {[...Array(16)].map((_, i) => (
+                <span
+                  key={i}
+                  className={`transition-colors duration-75 ${
+                    activeStep === i && isMasterPlaying
+                      ? "text-white font-black scale-125 drop-shadow-[0_0_8px_#fff]"
+                      : i % 4 === 0
+                      ? "text-amber font-extrabold"
+                      : "text-faint/60"
+                  }`}
+                >
+                  {i % 4 === 0 ? `B${Math.floor(i / 4) + 1}` : i + 1}
+                </span>
+              ))}
+            </div>
+          </div>
 
-      <div className="p-2.5 flex flex-col gap-3 bg-[#080a10] relative">
-        <div className={`absolute top-0 bottom-0 w-0.5 bg-white/10 z-0 pointer-events-none transition-all duration-75`} 
-             style={{ left: `${(activeStep / 16) * 100}%` }} />
+          <div className="p-2.5 flex flex-col gap-3 bg-[#080a10] relative">
+            <div className={`absolute top-0 bottom-0 w-0.5 bg-white/10 z-0 pointer-events-none transition-all duration-75`} 
+                 style={{ left: `${(activeStep / 16) * 100}%` }} />
         {[
           { id: "drums", title: "🥁 SECTION 01 · DRUMS & PERCUSSION MATRIX", color: "#ff3366" },
           { id: "chords", title: "🎹 SECTION 02 · HARMONIC CHORDS, PIANO & 808 GLIDES", color: "#b026ff" },
@@ -650,6 +653,8 @@ export function FLStudioChannelRack({
               </div>
             );
           })}
+          </div>
+        </div>
       </div>
 
       <div className="border-t border-white/10 bg-[#0a0c12] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-faint">

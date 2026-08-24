@@ -43,12 +43,19 @@ export function SyncedLyricsRack({
   const activeLine = activeIndex >= 0 ? syncedLines[activeIndex] : null;
   const currentSectionName = activeLine?.section || "Verse";
 
-  // Auto-scroll to active line
+  // Auto-scroll to active line inside container only
   useEffect(() => {
     if (autoScroll && activeLineRef.current && listContainerRef.current) {
-      activeLineRef.current.scrollIntoView({
+      const container = listContainerRef.current;
+      const activeEl = activeLineRef.current;
+      const targetScroll =
+        activeEl.offsetTop -
+        container.offsetTop -
+        container.clientHeight / 2 +
+        activeEl.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
         behavior: "smooth",
-        block: "center",
       });
     }
   }, [activeIndex, autoScroll]);

@@ -120,12 +120,19 @@ export function DedicatedLyricsColumn({
     }
   }
 
-  // Handle auto-scroll to keep active line centered
+  // Handle auto-scroll to keep active line centered inside the lyrics container (without scrolling the browser window)
   useEffect(() => {
     if (autoScroll && activeLineRef.current && containerRef.current) {
-      activeLineRef.current.scrollIntoView({
+      const container = containerRef.current;
+      const activeEl = activeLineRef.current;
+      const targetScroll =
+        activeEl.offsetTop -
+        container.offsetTop -
+        container.clientHeight / 2 +
+        activeEl.clientHeight / 2;
+      container.scrollTo({
+        top: Math.max(0, targetScroll),
         behavior: "smooth",
-        block: "center",
       });
     }
   }, [activeLineId, autoScroll]);
