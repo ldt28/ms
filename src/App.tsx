@@ -104,10 +104,23 @@ export default function App() {
   // full audio metrics while the report stays bound to the video/track page.
   const setFileExclusive = (f: File | null) => {
     setFile(f);
-    if (f && linkInfo?.kind === "direct") {
-      setLinkInfo(null);
-      setLinkError(null);
-      setLinkStatus("idle");
+    if (f) {
+      if (linkInfo?.kind === "direct") {
+        setLinkInfo(null);
+        setLinkError(null);
+        setLinkStatus("idle");
+      }
+      // Auto-extract artist & title from file name if empty or generic
+      const nameWithoutExt = f.name.replace(/\.[^/.]+$/, "");
+      if (nameWithoutExt.includes("-")) {
+        const parts = nameWithoutExt.split("-");
+        const rawArtist = parts[0].trim();
+        const rawTitle = parts.slice(1).join("-").trim();
+        if (rawArtist) setArtist(rawArtist);
+        if (rawTitle) setTitle(rawTitle);
+      } else if (!title) {
+        setTitle(nameWithoutExt);
+      }
     }
   };
 

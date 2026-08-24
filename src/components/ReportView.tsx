@@ -424,8 +424,8 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                   {(SOURCE_KIND[meta.source.kind] ?? SOURCE_KIND.unsupported).label}
                 </span>
                 {[
-                  meta.fileName !== "â€”" ? meta.fileName : null,
-                  meta.durationSec !== null ? formatTime(meta.durationSec) : yt.duration !== null ? `${formatTime(yt.duration)} Â· from player` : null,
+                  meta.fileName !== "—" ? meta.fileName : null,
+                  meta.durationSec !== null ? formatTime(meta.durationSec) : yt.duration !== null ? `${formatTime(yt.duration)} · from player` : null,
                   meta.sampleRate !== null ? `${(meta.sampleRate / 1000).toFixed(1)} kHz` : null,
                   meta.channels !== null ? `${meta.channels} ch` : null,
                 ].filter(Boolean).map((chip) => (
@@ -434,13 +434,13 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <button onClick={() => setIsRefMatcherOpen(true)} className="hide-on-print flex items-center gap-1.5 rounded-full border border-amber/60 bg-amber/15 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-amber shadow-sm transition hover:bg-amber hover:text-black cursor-pointer">
-                  <span>ðŸŽšï¸</span> Match EQ
+                  <span>🎚️</span> Match EQ
                 </button>
                 <button onClick={() => setIsSocialExportOpen(true)} className="hide-on-print flex items-center gap-1.5 rounded-full border border-mint/60 bg-mint/15 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-mint shadow-sm transition hover:bg-mint hover:text-black cursor-pointer">
-                  <span>ðŸ“±</span> 9:16 Video
+                  <span>📱</span> 9:16 Video
                 </button>
                 <button onClick={() => setIsExportOpen(true)} className="hide-on-print flex items-center gap-1.5 rounded-full border border-cyanx/50 bg-cyanx/10 px-3 py-1 font-mono text-[11px] font-bold tracking-wide text-cyanx shadow-sm transition hover:border-cyanx hover:bg-cyanx hover:text-black cursor-pointer">
-                  <span>â¤¹</span> Export
+                  <span>📥</span> Export
                 </button>
               </div>
               {meta.source.thumbnail && (
@@ -450,22 +450,22 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           </div>
           {(report.audioNote || report.audioError || report.transcriptionError || report.warnings.length > 0) && (
             <div className="mt-4 flex flex-col gap-2">
-              {report.audioNote && (<div className="rounded-xl border border-cyanx/30 bg-gradient-to-r from-cyanx/10 via-pit to-cyanx/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-cyanx shadow-md flex items-center justify-between gap-3"><div className="flex items-center gap-2.5 min-w-0"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-cyanx/20 text-cyanx">ðŸ“¡</span><span className="truncate"><strong className="text-ink">STREAM SYNC ACTIVE: </strong>{report.audioNote}</span></div><span className="shrink-0 rounded bg-cyanx/20 px-2 py-0.5 text-[9px] font-extrabold text-cyanx">DSP LOCKED</span></div>)}
-              {report.audioError && (<div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md"><span className="font-bold tracking-[0.14em]">AUDIO_ERROR Â· </span>{report.audioError}</div>)}
-              {report.transcriptionError && (<div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md"><span className="font-bold tracking-[0.14em]">TRANSCRIPTION_ERROR Â· </span>{report.transcriptionError}</div>)}
-              {report.warnings.map((w, i) => (<div key={i} className="rounded-xl border border-amber/40 bg-amber/8 px-4 py-3 font-mono text-[11px] leading-relaxed text-amber shadow-md"><span className="font-bold tracking-[0.14em]">NOTE Â· </span>{w}</div>))}
+              {report.audioNote && (<div className="rounded-xl border border-cyanx/30 bg-gradient-to-r from-cyanx/10 via-pit to-cyanx/5 px-4 py-3 font-mono text-[11px] leading-relaxed text-cyanx shadow-md flex items-center justify-between gap-3"><div className="flex items-center gap-2.5 min-w-0"><span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-cyanx/20 text-cyanx">📡</span><span className="truncate"><strong className="text-ink">STREAM SYNC ACTIVE: </strong>{report.audioNote}</span></div><span className="shrink-0 rounded bg-cyanx/20 px-2 py-0.5 text-[9px] font-extrabold text-cyanx">DSP LOCKED</span></div>)}
+              {report.audioError && (<div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md"><span className="font-bold tracking-[0.14em]">AUDIO_ERROR · </span>{report.audioError}</div>)}
+              {report.transcriptionError && (<div className="rounded-xl border border-rosex/45 bg-rosex/10 px-4 py-3 font-mono text-[11px] leading-relaxed text-rosex shadow-md"><span className="font-bold tracking-[0.14em]">TRANSCRIPTION_ERROR · </span>{report.transcriptionError}</div>)}
+              {report.warnings.map((w, i) => (<div key={i} className="rounded-xl border border-amber/40 bg-amber/8 px-4 py-3 font-mono text-[11px] leading-relaxed text-amber shadow-md"><span className="font-bold tracking-[0.14em]">NOTE · </span>{w}</div>))}
             </div>
           )}
         </div>
       </Reveal>
 
-      {/* â”€â”€ Transport HUD â”€â”€ */}
+      {/* ── Transport HUD ── */}
       <Reveal delay={30}>
         <div className="sticky top-0 z-30 rounded-2xl border border-cyanx/40 bg-gradient-to-r from-[#0d121f] via-[#090e18] to-[#0d121f] px-4 sm:px-6 py-3.5 shadow-2xl backdrop-blur-xl font-mono text-xs">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5">
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => handleTogglePlay()} className={`flex h-11 items-center gap-2.5 rounded-xl px-4 font-mono text-xs font-black tracking-wider transition-all cursor-pointer shadow-lg shrink-0 ${isPlaybackPlaying ? "bg-mint text-black shadow-mint/30 ring-2 ring-mint" : "bg-cyanx text-black shadow-cyanx/40 hover:bg-white hover:scale-105"}`}>
-                <span className="text-base">{isPlaybackPlaying ? "â¸" : "â–¶"}</span>
+                <span className="text-base">{isPlaybackPlaying ? "⏸" : "▶"}</span>
                 <span>{isPlaybackPlaying ? "PAUSE" : "PLAY TRACK"}</span>
               </button>
               <div className="flex flex-col min-w-0">
@@ -484,7 +484,7 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
                 <span className="text-dim font-bold text-[9.5px] mr-1">BEAT:</span>
                 {[0,1,2,3].map((b) => (<span key={b} className={`h-2.5 w-2.5 rounded-full transition-all duration-75 ${isPlaybackPlaying && currentBeatInBar === b ? b === 0 ? "bg-amber shadow-[0_0_8px_#ffd54f] scale-125" : "bg-cyanx shadow-[0_0_6px_#00f0ff] scale-110" : "bg-pit/70 border border-white/10"}`} />))}
               </div>
-              <button type="button" onClick={() => setIsLoopActive(!isLoopActive)} className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition cursor-pointer border ${isLoopActive ? "bg-amber text-black border-amber shadow-md shadow-amber/30" : "bg-pit/80 border-white/10 text-dim hover:text-ink"}`}>ðŸ” A/B LOOP</button>
+              <button type="button" onClick={() => setIsLoopActive(!isLoopActive)} className={`rounded-lg px-2.5 py-1 text-[10px] font-bold transition cursor-pointer border ${isLoopActive ? "bg-amber text-black border-amber shadow-md shadow-amber/30" : "bg-pit/80 border-white/10 text-dim hover:text-ink"}`}>🔁 A/B LOOP</button>
               <div className="flex items-center gap-1 overflow-x-auto">
                 {effectiveSections.map((sec, idx) => { const isActive = currentPlaybackTime >= sec.start && currentPlaybackTime < sec.end; return (<button key={idx} type="button" onClick={() => handleSeek(sec.start + 0.05)} className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold transition cursor-pointer shrink-0 ${isActive ? "bg-amber text-black shadow-md shadow-amber/40 scale-105" : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-cyanx/50"}`}>{sec.label}</button>); })}
               </div>

@@ -406,11 +406,23 @@ export async function analyzeAudioFile(file: File, onStage: StageFn): Promise<Au
     let label = "Section";
     const isFirst = i === 0;
     const isLast = i === boundaries.length - 2;
-    if (isFirst && (avgE < overallMean * 0.92 || eSec - s < durationSec * 0.18)) label = "Intro";
-    else if (isLast && avgE < overallMean * 0.85) label = "Outro";
-    else if (avgE > overallMean * 1.15) label = "Chorus?";
-    else if (avgE < overallMean * 0.88) label = "Verse?";
-    else label = "Bridge / build?";
+    const totalSecs = boundaries.length - 1;
+
+    if (isFirst && (avgE < overallMean * 0.95 || eSec - s < durationSec * 0.2)) {
+      label = "Intro";
+    } else if (isLast && (avgE < overallMean * 0.9 || eSec > durationSec * 0.85)) {
+      label = "Outro";
+    } else if (avgE > overallMean * 1.1) {
+      label = i <= totalSecs / 2 ? "Chorus 1" : "Chorus 2";
+    } else if (avgE < overallMean * 0.9) {
+      label = i <= totalSecs / 2 ? "Verse 1" : "Verse 2";
+    } else {
+      // Transition / Bridge fallback with section counter
+      if (i === 1) label = "Verse 1";
+      else if (i === 2) label = "Bridge / Build";
+      else if (i === totalSecs - 2) label = "Bridge";
+      else label = `Verse ${Math.min(3, Math.ceil(i / 2))}`;
+    }
 
     sections.push({ start: s, end: eSec, label, tier: "guessed", avgEnergy: avgE });
   }
