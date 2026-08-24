@@ -17,6 +17,7 @@ import { HarmonicDJAssistant } from "./HarmonicDJAssistant";
 import { VocalPitchHUD } from "./VocalPitchHUD";
 import { AnimatedSocialExportModal } from "./AnimatedSocialExportModal";
 import { AIProducerBlueprint } from "./AIProducerBlueprint";
+import { LiveMPCPadSampler } from "./LiveMPCPadSampler";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -679,6 +680,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           onTogglePlay={handleTogglePlay}
           onSeek={handleSeek}
         />
+      </Reveal>
+
+      {/* Live 16-Pad MPC Drum Sampler & Soundboard */}
+      <Reveal delay={76}>
+        <LiveMPCPadSampler />
       </Reveal>
 
       {/* AI Producer Suite & Song Reconstruction Masterclass */}

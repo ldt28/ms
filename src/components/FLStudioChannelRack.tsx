@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChannelPattern, InstrumentBreakdown, ReportData, Section } from "../lib/types";
 import { generateDynamicPatterns, playAuditionSound } from "../lib/patternEngine";
 import { PianoRollModal } from "./PianoRollModal";
+import { exportChannelsToMidi } from "../lib/midiExport";
 
 interface FLStudioChannelRackProps {
   currentTime: number;
@@ -239,6 +240,17 @@ export function FLStudioChannelRack({
     setTimeout(() => setCopiedStatus(false), 2000);
   };
 
+  const downloadMidiFile = () => {
+    const midiBytes = exportChannelsToMidi(currentChannels, effectiveBpm, `${effectiveSectionKey}-Groove`);
+    const blob = new Blob([midiBytes.buffer as ArrayBuffer], { type: "audio/midi" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${effectiveSectionKey.toLowerCase()}-pattern-${Math.round(effectiveBpm)}bpm.mid`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const keySignature = report?.keySig?.value || "F minor";
 
   const toggleMute = (id: string) => {
@@ -411,10 +423,18 @@ export function FLStudioChannelRack({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={downloadMidiFile}
+            className="px-2.5 py-0.5 rounded bg-amber/20 hover:bg-amber/30 text-amber border border-amber/40 font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
+            title="Download standard MIDI file (.mid) to drag & drop into FL Studio, Ableton, or Logic Pro"
+          >
+            <span>🎹</span> EXPORT MIDI (.MID)
+          </button>
+          <button
+            type="button"
             onClick={copyPatternJson}
             className="px-2.5 py-0.5 rounded bg-cyanx/10 hover:bg-cyanx/20 text-cyanx border border-cyanx/30 font-bold transition cursor-pointer"
           >
-            {copiedStatus ? "✓ COPIED JSON" : "📋 EXPORT PATTERN JSON"}
+            {copiedStatus ? "✓ COPIED JSON" : "📋 COPY JSON"}
           </button>
         </div>
       </div>
