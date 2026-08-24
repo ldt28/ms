@@ -318,6 +318,8 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
     (s) => currentPlaybackTime >= s.start && currentPlaybackTime < s.end
   );
 
+  const [isLoopActive, setIsLoopActive] = useState(false);
+
   // provenance tally
   const tally: Record<Tier, number> = { measured: 0, computed: 0, estimated: 0, guessed: 0 };
   const count = (t: Tier | undefined) => { if (t) tally[t]++; };
@@ -337,6 +339,56 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
   }
 
   const meanEnergyPct = Math.round(effectiveEnergy.avg * 100);
+
+  // Global Studio Keybindings (Space to Play/Pause, Arrow keys to Seek / Jump Sections, M to Mute)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || (e.target as HTMLElement)?.isContentEditable) {
+        return;
+      }
+
+      if (e.code === "Space") {
+        e.preventDefault();
+        handleTogglePlay();
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const curIdx = effectiveSections.findIndex((s) => currentPlaybackTime >= s.start && currentPlaybackTime < s.end);
+          const prevSec = effectiveSections[Math.max(0, curIdx - 1)];
+          if (prevSec) handleSeek(prevSec.start);
+        } else {
+          handleSeek(Math.max(0, currentPlaybackTime - 5));
+        }
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const curIdx = effectiveSections.findIndex((s) => currentPlaybackTime >= s.start && currentPlaybackTime < s.end);
+          const nextSec = effectiveSections[Math.min(effectiveSections.length - 1, curIdx + 1)];
+          if (nextSec) handleSeek(nextSec.start);
+        } else {
+          handleSeek(Math.min(effectiveDuration, currentPlaybackTime + 5));
+        }
+      } else if (e.code === "KeyM") {
+        if (audio) audio.muted = !audio.muted;
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [currentPlaybackTime, effectiveDuration, effectiveSections, audio]);
+
+  // A/B Section Looper Auto-Wrap
+  useEffect(() => {
+    if (!isLoopActive || !activeSection || !isPlaybackPlaying) return;
+    if (currentPlaybackTime >= activeSection.end - 0.2) {
+      handleSeek(activeSection.start + 0.05);
+    }
+  }, [isLoopActive, currentPlaybackTime, activeSection, isPlaybackPlaying]);
+
+  const effectiveTempoBpm = effectiveTempo.value || 120;
+  const beatDuration = 60 / effectiveTempoBpm;
+  const currentBeatInBar = Math.floor((currentPlaybackTime / beatDuration) % 4);
 
   return (
     <div className="signal-printable-report flex flex-col gap-5">
@@ -511,26 +563,60 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
               </div>
             </div>
 
-            {/* Right: Section Jump Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-              {effectiveSections.map((sec, idx) => {
-                const isActive = currentPlaybackTime >= sec.start && currentPlaybackTime < sec.end;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleSeek(sec.start + 0.05)}
-                    className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold transition cursor-pointer shrink-0 ${
-                      isActive
-                        ? "bg-amber text-black shadow-md shadow-amber/40 font-black scale-105"
-                        : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-cyanx/50"
+            {/* Right: Beat Pulse, A/B Loop & Section Jump Pills */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* 4-Beat Bar Pulse Indicator */}
+              <div className="flex items-center gap-1 rounded-lg bg-pit/80 border border-white/10 px-2 py-1 text-[9.5px]">
+                <span className="text-dim font-bold mr-1">BEAT:</span>
+                {[0, 1, 2, 3].map((b) => (
+                  <span
+                    key={b}
+                    className={`h-2.5 w-2.5 rounded-full transition-all duration-75 ${
+                      isPlaybackPlaying && currentBeatInBar === b
+                        ? b === 0
+                          ? "bg-amber shadow-[0_0_8px_#ffd54f] scale-125"
+                          : "bg-cyanx shadow-[0_0_8px_#00f0ff] scale-110"
+                        : "bg-white/10"
                     }`}
-                    title={`Jump to ${sec.label} (${formatTime(sec.start)})`}
-                  >
-                    {sec.label}
-                  </button>
-                );
-              })}
+                  />
+                ))}
+              </div>
+
+              {/* A/B Loop Toggle */}
+              <button
+                type="button"
+                onClick={() => setIsLoopActive(!isLoopActive)}
+                className={`rounded-lg px-2.5 py-1 text-[10px] font-extrabold transition cursor-pointer border ${
+                  isLoopActive
+                    ? "bg-purple-500 text-white border-purple-400 shadow-md shadow-purple-500/40 animate-pulse"
+                    : "bg-pit border-white/10 text-faint hover:text-ink hover:border-purple-400"
+                }`}
+                title={isLoopActive ? "Disable Section Loop" : "Loop Current Section Continuously"}
+              >
+                🔁 {isLoopActive ? "LOOP: ON" : "A/B LOOP"}
+              </button>
+
+              {/* Section Jump Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
+                {effectiveSections.map((sec, idx) => {
+                  const isActive = currentPlaybackTime >= sec.start && currentPlaybackTime < sec.end;
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSeek(sec.start + 0.05)}
+                      className={`rounded-lg px-2.5 py-1.5 text-[10px] font-extrabold transition cursor-pointer shrink-0 ${
+                        isActive
+                          ? "bg-amber text-black shadow-md shadow-amber/40 font-black scale-105"
+                          : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-cyanx/50"
+                      }`}
+                      title={`Jump to ${sec.label} (${formatTime(sec.start)})`}
+                    >
+                      {sec.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

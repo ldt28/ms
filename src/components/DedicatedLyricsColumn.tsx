@@ -40,6 +40,8 @@ export function DedicatedLyricsColumn({
   artist,
 }: DedicatedLyricsColumnProps) {
   const [autoScroll, setAutoScroll] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [exportLrcStatus, setExportLrcStatus] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
 
@@ -118,18 +120,36 @@ export function DedicatedLyricsColumn({
     }
   }
 
-  // Smoothly auto-scroll container only without hijacking browser window
+  // Handle auto-scroll to keep active line centered
   useEffect(() => {
     if (autoScroll && activeLineRef.current && containerRef.current) {
-      const container = containerRef.current;
-      const target = activeLineRef.current;
-      const targetOffset = target.offsetTop - container.offsetTop;
-      container.scrollTo({
-        top: Math.max(0, targetOffset - container.clientHeight / 3),
+      activeLineRef.current.scrollIntoView({
         behavior: "smooth",
+        block: "center",
       });
     }
   }, [activeLineId, autoScroll]);
+
+  const exportLrcFile = () => {
+    if (!rawSyncedLines || rawSyncedLines.length === 0) return;
+    const lrcContent = rawSyncedLines
+      .map((line) => {
+        const m = Math.floor(line.timeSec / 60).toString().padStart(2, "0");
+        const s = (line.timeSec % 60).toFixed(2).padStart(5, "0");
+        return `[${m}:${s}] ${line.text}`;
+      })
+      .join("\n");
+
+    const blob = new Blob([lrcContent], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${title || "lyrics"}.lrc`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setExportLrcStatus(true);
+    setTimeout(() => setExportLrcStatus(false), 2000);
+  };
 
   const geniusSearchUrl =
     lyrics?.geniusUrl ||
@@ -139,8 +159,8 @@ export function DedicatedLyricsColumn({
 
   return (
     <div className="hud-panel flex flex-col h-full max-h-[calc(100vh-100px)] overflow-hidden p-4 sm:p-5 select-none sticky top-6 shadow-2xl border border-cyanx/20">
-      {/* Header Bar with Sci-Fi Telemetry */}
-      <div className="border-b border-white/10 pb-3 flex flex-col gap-2 shrink-0">
+      {/* Header Bar with Telemetry */}
+      <div className="border-b border-white/10 pb-3 flex flex-col gap-2.5 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-cyanx animate-pulse shadow-sm shadow-cyanx" />
@@ -160,21 +180,52 @@ export function DedicatedLyricsColumn({
             {artist && <p className="font-mono text-xs text-dim truncate font-semibold">{artist}</p>}
           </div>
 
-          <a
-            href={geniusSearchUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="shrink-0 rounded-lg border border-[#ffff64]/50 bg-[#ffff64]/10 px-3 py-1.5 font-mono text-[10.5px] font-extrabold text-[#ffff64] hover:bg-[#ffff64]/20 transition flex items-center gap-1.5 shadow-sm"
-            title="Open verified lyrics on Genius.com"
-          >
-            <span>🟡 Genius ↗</span>
-          </a>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={exportLrcFile}
+              className="rounded-lg border border-cyanx/40 bg-cyanx/10 px-2.5 py-1.5 font-mono text-[10px] font-bold text-cyanx hover:bg-cyanx hover:text-black transition cursor-pointer"
+              title="Export Synced Lyrics as .LRC File"
+            >
+              {exportLrcStatus ? "✓ EXPORTED" : "⬇ .LRC"}
+            </button>
+
+            <a
+              href={geniusSearchUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-[#ffff64]/50 bg-[#ffff64]/10 px-2.5 py-1.5 font-mono text-[10px] font-extrabold text-[#ffff64] hover:bg-[#ffff64]/20 transition flex items-center gap-1 shadow-sm"
+              title="Open verified lyrics on Genius.com"
+            >
+              <span>Genius ↗</span>
+            </a>
+          </div>
+        </div>
+
+        {/* Live Search & Filter Bar */}
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="🔍 Search lyrics in this track..."
+            className="w-full rounded-lg bg-[#070a10] border border-white/10 px-3 py-1.5 text-xs text-ink placeholder:text-faint/60 focus:border-cyanx focus:outline-hidden font-mono"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 text-faint hover:text-ink text-xs cursor-pointer"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
         {/* Status Bar */}
-        <div className="flex items-center justify-between pt-1 font-mono text-[11px] text-faint">
+        <div className="flex items-center justify-between pt-0.5 font-mono text-[10.5px] text-faint">
           <span className="text-cyanx/80 font-bold">
-            {sectionGroups.length} SECTIONS · {totalLyricLines} LINES · {formatDuration(safeDuration)}
+            {sectionGroups.length} SECTIONS · {totalLyricLines} LINES
           </span>
           <button
             onClick={() => setAutoScroll(!autoScroll)}
@@ -289,7 +340,7 @@ export function DedicatedLyricsColumn({
                               </span>
                             </div>
 
-                            {/* Crisp, Readable Lyric Text */}
+                            {/* Crisp, Readable Lyric Text with Search Highlighting */}
                             <p
                               className={`font-sans text-sm sm:text-[14.5px] leading-relaxed transition-all flex-1 ${
                                 isLineActive
@@ -297,7 +348,21 @@ export function DedicatedLyricsColumn({
                                   : "text-ink/90 font-medium group-hover:text-ink"
                               }`}
                             >
-                              {line.text}
+                              {searchQuery && line.text.toLowerCase().includes(searchQuery.toLowerCase()) ? (
+                                <span>
+                                  {line.text.split(new RegExp(`(${searchQuery})`, "gi")).map((part, pIdx) =>
+                                    part.toLowerCase() === searchQuery.toLowerCase() ? (
+                                      <mark key={pIdx} className="bg-yellow-400 text-black font-black px-1 rounded shadow-xs">
+                                        {part}
+                                      </mark>
+                                    ) : (
+                                      part
+                                    )
+                                  )}
+                                </span>
+                              ) : (
+                                line.text
+                              )}
                             </p>
 
                             {/* Live Active Karaoke Pulse */}

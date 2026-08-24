@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChannelPattern, InstrumentBreakdown, ReportData, Section } from "../lib/types";
 import { generateDynamicPatterns, playAuditionSound } from "../lib/patternEngine";
+import { PianoRollModal } from "./PianoRollModal";
 
 interface FLStudioChannelRackProps {
   currentTime: number;
@@ -49,6 +50,14 @@ export function FLStudioChannelRack({
   const [selectedPatternMode, setSelectedPatternMode] = useState<string>("auto");
   const [mutedChannels, setMutedChannels] = useState<Record<string, boolean>>({});
   const [soloChannel, setSoloChannel] = useState<string | null>(null);
+  const [channelPans, setChannelPans] = useState<Record<string, number>>({});
+  const [channelVols, setChannelVols] = useState<Record<string, number>>({});
+  const [activePianoRollTrack, setActivePianoRollTrack] = useState<{
+    id: string;
+    name: string;
+    notes?: (string | null)[];
+  } | null>(null);
+  const [copiedStatus, setCopiedStatus] = useState(false);
   const [customBpm, setCustomBpm] = useState<number | null>(null);
   const detectedBpm = bpm && bpm > 40 && bpm < 260 ? bpm : 120;
   // If detected BPM is half-time trap (60-95 BPM), default to 2x double-time for snappy 16th grid rhythm
@@ -165,9 +174,7 @@ export function FLStudioChannelRack({
   };
 
   const toggleStep = (channelId: string, stepIdx: number) => {
-    // Play real-time synthesized audition sound
     playAuditionSound(channelId);
-
     setPatternBank((prev) => {
       const sectionChans = prev[effectiveSectionKey] || [];
       const updated = sectionChans.map((ch) => {
@@ -182,6 +189,58 @@ export function FLStudioChannelRack({
     });
   };
 
+  const fillFourOnFloor = () => {
+    setPatternBank((prev) => {
+      const sectionChans = prev[effectiveSectionKey] || [];
+      const updated = sectionChans.map((ch) => {
+        if (ch.id === "kick_punch") {
+          const newSteps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
+          return { ...ch, steps: newSteps };
+        }
+        if (ch.id === "snare_acoustic" || ch.id === "clap_snap") {
+          const newSteps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
+          return { ...ch, steps: newSteps };
+        }
+        return ch;
+      });
+      return { ...prev, [effectiveSectionKey]: updated };
+    });
+  };
+
+  const randomizeTrapHats = () => {
+    setPatternBank((prev) => {
+      const sectionChans = prev[effectiveSectionKey] || [];
+      const updated = sectionChans.map((ch) => {
+        if (ch.id === "hat_closed" || ch.id === "hat_triplet_rolls") {
+          const newSteps = [...Array(16)].map((_, i) => (i % 2 === 0 ? true : Math.random() > 0.4));
+          return { ...ch, steps: newSteps };
+        }
+        return ch;
+      });
+      return { ...prev, [effectiveSectionKey]: updated };
+    });
+  };
+
+  const clearCurrentPattern = () => {
+    setPatternBank((prev) => {
+      const sectionChans = prev[effectiveSectionKey] || [];
+      const updated = sectionChans.map((ch) => ({
+        ...ch,
+        steps: Array(16).fill(false),
+      }));
+      return { ...prev, [effectiveSectionKey]: updated };
+    });
+  };
+
+  const copyPatternJson = () => {
+    const dataStr = JSON.stringify(currentChannels, null, 2);
+    navigator.clipboard.writeText(dataStr);
+    setCopiedStatus(true);
+    setTimeout(() => setCopiedStatus(false), 2000);
+  };
+
+  const keySignature = report?.keySig?.value || "F minor";
+
   const toggleMute = (id: string) => {
     setMutedChannels((prev) => ({ ...prev, [id]: !prev[id] }));
   };
@@ -190,7 +249,6 @@ export function FLStudioChannelRack({
     setSoloChannel((prev) => (prev === id ? null : id));
   };
 
-  // Play synthesized drum/instrument audio on step trigger if soundAudioEnabled is active
   useEffect(() => {
     if (!isMasterPlaying || !soundAudioEnabled) return;
     currentChannels.forEach((ch) => {
@@ -209,11 +267,9 @@ export function FLStudioChannelRack({
   );
 
   return (
-    <div className="hud-panel rounded-xl border border-cyanx/20 bg-[#0d1017] shadow-2xl overflow-hidden font-mono text-xs select-none">
-      {/* Top Futuristic DAW Header with Play Button, Speed Controls & Phase Nudge */}
+    <div className="hud-panel rounded-xl border border-cyanx/20 bg-[#0d1017] shadow-2xl overflow-hidden font-mono text-xs select-none relative">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-white/10 bg-[#121622] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Main Integrated Play/Pause Button */}
           <button
             type="button"
             onClick={handleSequencerPlayToggle}
@@ -235,7 +291,6 @@ export function FLStudioChannelRack({
             </span>
           </div>
 
-          {/* BPM & Speed Multiplier (0.5x, 1x, 2x RAPID) */}
           <div className="flex items-center gap-1.5 rounded-lg bg-pit border border-cyanx/40 px-2.5 py-1 text-[10.5px] font-extrabold text-cyanx shadow-inner">
             <span className="text-amber">{effectiveBpm.toFixed(1)} BPM</span>
             <div className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1.5 text-[9.5px]">
@@ -260,14 +315,12 @@ export function FLStudioChannelRack({
             </div>
           </div>
 
-          {/* Phase Nudge Control */}
           <div className="flex items-center gap-1 rounded-lg bg-pit border border-white/10 px-2 py-1 text-[9.5px] text-faint">
             <span className="font-bold text-dim">ALIGN:</span>
             <button
               type="button"
               onClick={() => setPhaseNudgeMs((p) => p - 25)}
               className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
-              title="Nudge step grid back by -25ms"
             >
               -25ms
             </button>
@@ -276,22 +329,11 @@ export function FLStudioChannelRack({
               type="button"
               onClick={() => setPhaseNudgeMs((p) => p + 25)}
               className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
-              title="Nudge step grid forward by +25ms"
             >
               +25ms
             </button>
-            {phaseNudgeMs !== 0 && (
-              <button
-                type="button"
-                onClick={() => setPhaseNudgeMs(0)}
-                className="text-rosex hover:underline cursor-pointer ml-0.5 text-[8.5px]"
-              >
-                Reset
-              </button>
-            )}
           </div>
 
-          {/* Section Pattern Switcher */}
           <div className="flex items-center gap-1 overflow-x-auto">
             {AVAILABLE_PATTERNS.map((p) => (
               <button
@@ -303,7 +345,6 @@ export function FLStudioChannelRack({
                     ? "bg-amber text-black shadow-md font-black scale-105"
                     : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-amber/50"
                 }`}
-                title={`Select ${p.label} & Jump to section`}
               >
                 {p.label}
               </button>
@@ -311,7 +352,6 @@ export function FLStudioChannelRack({
           </div>
         </div>
 
-        {/* Stem Category Filter Tabs & Synth Audio Preview Toggle */}
         <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-0.5">
           <button
             type="button"
@@ -321,7 +361,6 @@ export function FLStudioChannelRack({
                 ? "border-mint bg-mint/20 text-mint animate-pulse"
                 : "border-white/10 bg-pit/60 text-faint hover:text-dim"
             }`}
-            title="Toggle synthesized drum clicks in sync with step playhead"
           >
             {soundAudioEnabled ? "🔊 SYNTH SOUNDS: ON" : "🔇 SYNTH SOUNDS: OFF"}
           </button>
@@ -343,13 +382,49 @@ export function FLStudioChannelRack({
         </div>
       </div>
 
-      {/* 16-Step Beat Grid Header (1, 2, 3, 4) */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-[#0a0d16] border-b border-white/5 text-[9.5px]">
+        <div className="flex items-center gap-2 text-faint">
+          <span className="font-bold text-cyanx">QUICK PATTERN TOOLS:</span>
+          <button
+            type="button"
+            onClick={fillFourOnFloor}
+            className="px-2 py-0.5 rounded bg-white/5 hover:bg-cyanx/20 hover:text-cyanx border border-white/10 transition cursor-pointer"
+          >
+            ⚡ 4-on-Floor Beat
+          </button>
+          <button
+            type="button"
+            onClick={randomizeTrapHats}
+            className="px-2 py-0.5 rounded bg-white/5 hover:bg-amber/20 hover:text-amber border border-white/10 transition cursor-pointer"
+          >
+            🎲 Trap Hat Rolls
+          </button>
+          <button
+            type="button"
+            onClick={clearCurrentPattern}
+            className="px-2 py-0.5 rounded bg-white/5 hover:bg-rosex/20 hover:text-rosex border border-white/10 transition cursor-pointer"
+          >
+            🧹 Clear
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={copyPatternJson}
+            className="px-2.5 py-0.5 rounded bg-cyanx/10 hover:bg-cyanx/20 text-cyanx border border-cyanx/30 font-bold transition cursor-pointer"
+          >
+            {copiedStatus ? "✓ COPIED JSON" : "📋 EXPORT PATTERN JSON"}
+          </button>
+        </div>
+      </div>
+
       <div className="hidden sm:flex items-center gap-2.5 px-4 py-1.5 bg-[#090b12] border-b border-white/5 text-[9.5px] text-faint">
-        <div className="w-40 shrink-0 font-bold uppercase tracking-wider text-cyanx/80">
+        <div className="w-52 shrink-0 font-bold uppercase tracking-wider text-cyanx/80">
           Instrument Stems ({filteredChannels.length})
         </div>
-        <div className="w-16 shrink-0 text-center">Peak VU</div>
-        <div className="flex-1 grid grid-cols-16 gap-1 text-center font-bold">
+        <div className="w-14 shrink-0 text-center">Peak VU</div>
+        <div className="flex-1 grid grid-cols-16 gap-1 text-center font-bold relative">
           {[...Array(16)].map((_, i) => (
             <span
               key={i}
@@ -367,8 +442,9 @@ export function FLStudioChannelRack({
         </div>
       </div>
 
-      {/* Channel Pattern Rows with Category Dividers */}
-      <div className="p-2.5 flex flex-col gap-3 bg-[#080a10]">
+      <div className="p-2.5 flex flex-col gap-3 bg-[#080a10] relative">
+        <div className={`absolute top-0 bottom-0 w-0.5 bg-white/10 z-0 pointer-events-none transition-all duration-75`} 
+             style={{ left: `${(activeStep / 16) * 100}%` }} />
         {[
           { id: "drums", title: "🥁 SECTION 01 · DRUMS & PERCUSSION MATRIX", color: "#ff3366" },
           { id: "chords", title: "🎹 SECTION 02 · HARMONIC CHORDS, PIANO & 808 GLIDES", color: "#b026ff" },
@@ -386,7 +462,6 @@ export function FLStudioChannelRack({
 
             return (
               <div key={sec.id} className="flex flex-col gap-1.5 rounded-xl border border-white/5 bg-[#0a0d15] p-2">
-                {/* Category Section Header Banner */}
                 {selectedCategory === "all" && (
                   <div
                     className="flex items-center justify-between px-2.5 py-1 rounded bg-[#0f1422] border-l-2 text-[10px] font-bold tracking-wider uppercase"
@@ -398,24 +473,23 @@ export function FLStudioChannelRack({
                         {sectionChannels.length} tracks
                       </span>
                     </div>
-                    <span className="text-[8.5px] font-mono text-faint">DSP STEM TRANSIENTS</span>
                   </div>
                 )}
 
                 {sectionChannels.map((ch) => {
                   const isMuted = soloChannel ? soloChannel !== ch.id : !!mutedChannels[ch.id];
                   const isSoloed = soloChannel === ch.id;
-
                   const isStemDetected = instruments?.instruments
                     ? instruments.instruments.some((inst) => inst.id.toLowerCase().includes(ch.family.toLowerCase()) && inst.detected)
                     : true;
-
                   const isStepTriggered = ch.steps[activeStep] && isMasterPlaying && !isMuted && isStemDetected;
                   const peakLevel = isStepTriggered
                     ? Math.min(100, Math.floor(ch.vol * (0.9 + Math.random() * 0.1)))
                     : isMasterPlaying && !isMuted
                     ? Math.floor(Math.random() * 20)
                     : 0;
+
+                  const isMelodicChannel = ch.category === "chords" || ch.category === "synths" || ch.id.includes("piano") || ch.id.includes("rhodes");
 
                   return (
                     <div
@@ -428,25 +502,21 @@ export function FLStudioChannelRack({
                           : "bg-[#111520] hover:bg-[#161c2b] border border-white/5"
                       }`}
                     >
-                      {/* Mute & Solo Buttons */}
                       <div className="flex items-center gap-1 shrink-0">
                         <button
                           type="button"
                           onClick={() => toggleMute(ch.id)}
-                          title={isMuted ? "Unmute Channel" : "Mute Channel"}
-                          className={`h-4 w-4 rounded border transition-all cursor-pointer flex items-center justify-center ${
+                          className={`h-4 w-4 rounded border transition-all cursor-pointer ${
                             isMuted
                               ? "border-white/10 bg-pit text-faint"
-                              : "border-mint bg-mint/20 text-mint shadow-xs shadow-mint ring-1 ring-mint/50"
+                              : "border-mint bg-mint/20 text-mint"
                           }`}
                         >
                           <span className={`h-1.5 w-1.5 rounded-full ${isMuted ? "bg-faint" : "bg-mint"}`} />
                         </button>
-
                         <button
                           type="button"
                           onClick={() => toggleSolo(ch.id)}
-                          title={isSoloed ? "Un-solo" : "Solo Channel"}
                           className={`h-4 px-1 rounded border text-[8px] font-black transition-all cursor-pointer ${
                             isSoloed
                               ? "border-amber bg-amber text-black"
@@ -457,10 +527,9 @@ export function FLStudioChannelRack({
                         </button>
                       </div>
 
-                      {/* Track Number & Name (Click to Audition Sound, Flashes on Step Hit) */}
                       <div
                         onClick={() => playAuditionSound(ch.id, ch.stepNotes?.[activeStep])}
-                        className={`flex items-center gap-2 w-44 shrink-0 cursor-pointer group px-1.5 py-1 rounded transition-all duration-75 ${
+                        className={`flex items-center gap-1.5 w-44 shrink-0 cursor-pointer group px-1.5 py-1 rounded transition-all duration-75 ${
                           isStepTriggered
                             ? "scale-[1.04] bg-white/20"
                             : "hover:bg-white/5"
@@ -473,48 +542,52 @@ export function FLStudioChannelRack({
                               }
                             : undefined
                         }
-                        title={`Click to preview ${ch.name} sound · ${ch.description}`}
                       >
                         <span className={`font-mono text-[9px] font-bold tracking-wider ${isStepTriggered ? "text-white" : "text-faint"}`}>
                           {ch.num}
                         </span>
                         <span
-                          className={`font-black text-[11px] truncate transition-all duration-75 ${
+                          className={`font-black text-[11px] truncate transition-all duration-75 flex-1 ${
                             isStepTriggered ? "text-white drop-shadow-[0_0_10px_#fff]" : "drop-shadow"
                           }`}
                           style={{ color: isStepTriggered ? "#ffffff" : ch.color }}
                         >
                           {ch.name}
                         </span>
+                        {isMelodicChannel && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActivePianoRollTrack({
+                                id: ch.id,
+                                name: ch.name,
+                                notes: ch.stepNotes,
+                              });
+                            }}
+                            className="px-1 py-0.5 rounded bg-purple-500/20 border border-purple-500/40 text-[8px] font-bold text-purple-300 hover:bg-purple-500 hover:text-black transition"
+                          >
+                            ROLL
+                          </button>
+                        )}
                       </div>
 
-                      {/* Calibrated 10-Segment LED Meter */}
-                      <div className="w-16 shrink-0 flex items-center gap-0.5 px-1 bg-[#05070a] rounded py-1 border border-white/10 shadow-inner">
+                      <div className="w-14 shrink-0 flex items-center gap-0.5 px-1 bg-[#05070a] rounded py-1 border border-white/10 shadow-inner">
                         {[...Array(10)].map((_, segIdx) => {
                           const segThreshold = (segIdx / 10) * 100;
                           const isLit = peakLevel > segThreshold;
-                          const isRed = segIdx >= 8;
-                          const isYellow = segIdx >= 5 && segIdx < 8;
-
                           return (
                             <div
                               key={segIdx}
-                              className={`h-2.5 flex-1 rounded-[1px] transition-all duration-75 ${
-                                isLit
-                                  ? isRed
-                                    ? "bg-[#ff0055] shadow-xs shadow-[#ff0055]"
-                                    : isYellow
-                                    ? "bg-[#ffaa00] shadow-xs shadow-[#ffaa00]"
-                                    : "bg-[#00ff9d] shadow-xs shadow-[#00ff9d]"
-                                  : "bg-[#181e2b]"
+                              className={`h-2.5 flex-1 rounded-[1px] ${
+                                isLit ? "bg-[#00ff9d]" : "bg-[#181e2b]"
                               }`}
                             />
                           );
                         })}
                       </div>
 
-                      {/* 16-Step Illuminated Touch Trigger Pads with Musical Note & Chord Display */}
-                      <div className="flex-1 grid grid-cols-16 gap-1 min-w-[160px]">
+                      <div className="flex-1 grid grid-cols-16 gap-1 min-w-[160px] relative">
                         {ch.steps.map((isActiveStep, sIdx) => {
                           const isBeatQuarter = sIdx % 4 === 0;
                           const isCurrentlyPlayingThisStep = activeStep === sIdx && isMasterPlaying;
@@ -525,44 +598,27 @@ export function FLStudioChannelRack({
                               key={sIdx}
                               type="button"
                               onClick={() => toggleStep(ch.id, sIdx)}
-                              title={`Step ${sIdx + 1} (${isBeatQuarter ? "Beat downbeat" : "16th note"}) ${
-                                stepNote ? `· Note/Chord: ${stepNote}` : ""
-                              } — Click to toggle`}
                               style={
                                 isActiveStep && isCurrentlyPlayingThisStep
                                   ? {
-                                      boxShadow: `0 0 22px 5px ${ch.color}, 0 0 12px #fff`,
+                                      boxShadow: `0 0 22px 5px ${ch.color}`,
                                       backgroundColor: "#ffffff",
                                       borderColor: ch.color,
                                     }
                                   : undefined
                               }
-                              className={`h-6 rounded-[2px] border transition-all duration-75 cursor-pointer flex items-center justify-center overflow-hidden px-0.5 ${
-                                isCurrentlyPlayingThisStep
-                                  ? isActiveStep
-                                    ? "ring-4 ring-white scale-125 z-20 brightness-200"
-                                    : "ring-2 ring-white/70 scale-110 z-10"
-                                  : "hover:brightness-125"
-                              } ${
+                              className={`h-6 rounded-[2px] border transition-all duration-75 cursor-pointer ${
                                 isActiveStep
                                   ? isBeatQuarter
-                                    ? "bg-[#ff3366] border-[#ff6688] shadow-sm shadow-[#ff3366]/40"
+                                    ? "bg-[#ff3366] border-[#ff6688]"
                                     : "bg-[#8899aa] border-[#aabbcc]"
                                   : isBeatQuarter
-                                  ? "bg-[#1c2230] border-white/10 hover:bg-[#252d40]"
-                                  : "bg-[#10141d] border-white/5 hover:bg-[#181e2a]"
+                                  ? "bg-[#1c2230] border-white/10"
+                                  : "bg-[#10141d] border-white/5"
                               }`}
                             >
                               {isActiveStep && stepNote ? (
-                                <span
-                                  className={`font-mono text-[7px] font-black leading-none truncate ${
-                                    isCurrentlyPlayingThisStep
-                                      ? "text-black font-extrabold"
-                                      : "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]"
-                                  }`}
-                                >
-                                  {stepNote}
-                                </span>
+                                <span className="font-mono text-[7px] text-white font-bold">{stepNote}</span>
                               ) : null}
                             </button>
                           );
@@ -576,17 +632,28 @@ export function FLStudioChannelRack({
           })}
       </div>
 
-      {/* Footer Status Readout */}
       <div className="border-t border-white/10 bg-[#0a0c12] px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-[10px] text-faint">
         <div className="flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-cyanx" />
-          <span>PATTERN: <strong className="text-amber">{effectiveSectionKey.toUpperCase()}</strong> · CLICK PADS TO AUDITION & EDIT</span>
+          <span className="text-cyanx font-bold">ACTIVE SECTION: {effectiveSectionKey.toUpperCase()}</span>
+          <span>·</span>
+          <span>{filteredChannels.length} Stems Loaded</span>
+          <span>·</span>
+          <span className="text-amber">Key: {keySignature}</span>
         </div>
-        <span className="text-cyanx font-bold">
-          [TEMPO-LOCKED QUANTIZER · {effectiveBpm.toFixed(0)} BPM · 16TH GRID]
-        </span>
+        <div className="flex items-center gap-3">
+          <span>Click pads to program notes · Click channel name to audition sound</span>
+        </div>
       </div>
+
+      {activePianoRollTrack && (
+        <PianoRollModal
+          isOpen={!!activePianoRollTrack}
+          onClose={() => setActivePianoRollTrack(null)}
+          channelName={activePianoRollTrack.name}
+          keySignature={keySignature}
+          stepNotes={activePianoRollTrack.notes}
+        />
+      )}
     </div>
   );
 }
-

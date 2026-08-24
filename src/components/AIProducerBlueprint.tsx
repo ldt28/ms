@@ -155,12 +155,59 @@ export function AIProducerBlueprint({ report }: AIProducerBlueprintProps) {
         </div>
       )}
 
-      {/* Tab 2: DAW Remake Recipe */}
+      {/* Tab 2: DAW Remake Recipe & Mix Presets */}
       {activeTab === "recipe" && (
-        <div className="mt-5 flex flex-col gap-3">
+        <div className="mt-5 flex flex-col gap-4">
           <div className="rounded-xl border border-amber/30 bg-amber/[0.04] p-4 text-[11.5px] leading-relaxed text-ink/90 flex flex-col gap-3">
-            <div className="flex items-center gap-2 font-bold text-amber text-xs uppercase tracking-wider">
-              <span>🎛️</span> Step-by-Step FL Studio & Ableton Remake Blueprint
+            <div className="flex items-center justify-between font-bold text-amber text-xs uppercase tracking-wider border-b border-amber/20 pb-2">
+              <div className="flex items-center gap-2">
+                <span>🎛️</span> Step-by-Step FL Studio & Ableton Remake Blueprint
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const sheetText = `=====================================================
+AI PRODUCER SUITE // DAW REMAKE BLUEPRINT
+TRACK: ${meta.title} (${meta.artist || "Unknown Artist"})
+=====================================================
+TEMPO: ${bpm} BPM
+KEY: ${key}
+CHORD PROGRESSION: ${romanChords}
+DOMINANT INSTRUMENT: ${dominantFamily}
+DYNAMIC RANGE: ${dynamicRange}
+
+1. PROJECT INITIALIZATION
+   - Set DAW Master Tempo: ${bpm} BPM
+   - Project Scale: ${key}
+
+2. LOW-END & DRUM PROGRAMMING
+   - 808 Root: ${key.split(" ")[0]}1 (35 - 65 Hz)
+   - Kick Pattern: Beats 1 & 3 with syncopated 16th ghost hits
+   - Snare/Clap: Beats 2 & 4 (Steps 5 & 13)
+   - Hi-Hats: 16th notes with 1/32 triplet rolls leading into bar downbeats
+
+3. HARMONIC & KEYS ENGINE
+   - Instrument: Felt Piano / Vintage Rhodes
+   - Voicing: ${romanChords} in Octaves 3 & 4
+   - Mix: High-pass at 180 Hz, notch at 400 Hz for vocal pocket
+
+4. MIX & MASTER CHAIN TARGETS
+   - FabFilter Saturn / Tape Saturation on 808
+   - Sidechain Kick -> 808 (-4 dB gain reduction, 45ms release)
+   - Master Limiting Target: -8 to -9 LUFS
+=====================================================`;
+                  const blob = new Blob([sheetText], { type: "text/plain;charset=utf-8" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = `${meta.title || "track"}-daw-blueprint.txt`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-2.5 py-1 rounded bg-amber text-black font-black hover:bg-white transition cursor-pointer text-[10px] shadow-sm"
+              >
+                ⬇ DOWNLOAD DAW SETUP SHEET (.TXT)
+              </button>
             </div>
 
             <ol className="flex flex-col gap-2.5 pl-4 list-decimal text-dim">
