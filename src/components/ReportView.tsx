@@ -18,6 +18,7 @@ import { VocalPitchHUD } from "./VocalPitchHUD";
 import { AnimatedSocialExportModal } from "./AnimatedSocialExportModal";
 import { AIProducerBlueprint } from "./AIProducerBlueprint";
 import { LiveMPCPadSampler } from "./LiveMPCPadSampler";
+import { AudioSpectrumHUD } from "./AudioSpectrumHUD";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -713,6 +714,15 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         </div>
       </Reveal>
       )}
+
+      {/* Real-Time 32-Band Audio Spectrum Analyzer & Oscilloscope HUD */}
+      <Reveal delay={79}>
+        <AudioSpectrumHUD
+          isPlaying={isPlaybackPlaying}
+          currentTime={currentPlaybackTime}
+          texture={report.texture}
+        />
+      </Reveal>
 
       {/* texture */}
       {report.texture && (

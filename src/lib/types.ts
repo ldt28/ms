@@ -151,6 +151,12 @@ export interface InstrumentBreakdown {
   sectionPatterns?: Record<string, ChannelPattern[]>;
 }
 
+export interface TextureAnalysis {
+  bassRatio: Finding<number>;
+  brightnessHz: Finding<number>;
+  onsetRate: Finding<number>;
+}
+
 export interface ReportData {
   meta: {
     title: string;
@@ -171,11 +177,7 @@ export interface ReportData {
     peak: number;
     dynamicRangeDb: number;
   } | null;
-  texture: {
-    bassRatio: Finding<number>;
-    brightnessHz: Finding<number>;
-    onsetRate: Finding<number>;
-  } | null;
+  texture: TextureAnalysis | null;
   sections: Section[];
   harmonics?: HarmonicBreakdown | null;
   instruments?: InstrumentBreakdown | null;
