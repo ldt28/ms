@@ -264,13 +264,21 @@ function getChordsForKey(keyStr: string): { i: string; VI: string; iv: string; V
   return { i: "Bbm", VI: "Gbmaj7", iv: "Ebm7", V: "F7", notes: ["Bb", "Db", "F", "Ab"] };
 }
 
+export type GrooveFeel = "half_time_trap" | "standard_pop" | "four_floor";
+
 /**
  * Derives section-specific step patterns with exact Musical Notes for each channel.
  */
-export function generateDynamicPatterns(report?: Partial<ReportData> | null): Record<string, ChannelPattern[]> {
+export function generateDynamicPatterns(
+  report?: Partial<ReportData> | null,
+  grooveFeel: GrooveFeel = "half_time_trap"
+): Record<string, ChannelPattern[]> {
   const keySig = report?.keySig?.value || "F minor";
   const chords = getChordsForKey(keySig);
   const rootNote = keySig.split(" ")[0] || "F";
+
+  const isHalfTime = grooveFeel === "half_time_trap";
+  const isFourFloor = grooveFeel === "four_floor";
 
   const buildPattern = (secName: "Intro" | "Verse" | "Chorus" | "Bridge" | "Outro"): ChannelPattern[] => {
     return GRANULAR_CHANNELS.map((ch) => {
@@ -280,13 +288,25 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
       switch (ch.id) {
         case "kick_drum":
           if (secName === "Intro" || secName === "Outro") {
-            steps = [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
-          } else if (secName === "Chorus") {
-            // High-energy 4-on-the-floor trap punch
+            steps = isFourFloor
+              ? [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false]
+              : [true, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
+          } else if (isFourFloor) {
             steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
+          } else if (isHalfTime) {
+            // Half-time trap kick pattern (syncopated hit on 1, 1.3, 3.2)
+            if (secName === "Chorus") {
+              steps = [true, false, false, false, false, false, true, false, false, false, true, false, false, true, false, false];
+            } else {
+              steps = [true, false, false, false, false, false, true, false, false, false, false, false, false, true, false, false];
+            }
           } else {
-            // Syncopated trap kick
-            steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, true, false, false];
+            // Standard 4/4 Pop kick
+            if (secName === "Chorus") {
+              steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
+            } else {
+              steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, true, false, false];
+            }
           }
           break;
 
@@ -294,13 +314,22 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
           if (secName === "Intro") {
             steps = Array(16).fill(false);
           } else if (secName === "Chorus") {
-            steps = [true, false, false, true, false, false, true, false, true, false, false, true, false, true, false, false];
-            stepNotes[0] = `${rootNote}1`;
-            stepNotes[3] = `${rootNote}1`;
-            stepNotes[6] = "Db1";
-            stepNotes[8] = `${rootNote}1`;
-            stepNotes[11] = "C1";
-            stepNotes[13] = "Ab1";
+            if (isHalfTime) {
+              // Trap 808: Root on beat 1 (step 0), pickup on step 6, drop on step 8 (beat 3 with snare) and glide on 14
+              steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, false, true, false];
+              stepNotes[0] = `${rootNote}1`;
+              stepNotes[6] = "Db1";
+              stepNotes[8] = `${rootNote}1`;
+              stepNotes[14] = "C1";
+            } else {
+              steps = [true, false, false, true, false, false, true, false, true, false, false, true, false, true, false, false];
+              stepNotes[0] = `${rootNote}1`;
+              stepNotes[3] = `${rootNote}1`;
+              stepNotes[6] = "Db1";
+              stepNotes[8] = `${rootNote}1`;
+              stepNotes[11] = "C1";
+              stepNotes[13] = "Ab1";
+            }
           } else {
             steps = [true, false, false, false, false, false, true, false, true, false, false, false, false, false, true, false];
             stepNotes[0] = `${rootNote}1`;
@@ -313,8 +342,11 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
         case "snare_acoustic":
           if (secName === "Intro" || secName === "Outro") {
             steps = Array(16).fill(false);
+          } else if (isHalfTime) {
+            // Half-time Trap: Snare hits on Beat 3 (Step 8)
+            steps = [false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
           } else {
-            // Backbeat on beats 2 & 4 (steps 5 & 13)
+            // Standard backbeat on beats 2 & 4 (steps 4 & 12)
             steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
           }
           break;
@@ -322,8 +354,15 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
         case "clap_stereo":
           if (secName === "Intro") {
             steps = Array(16).fill(false);
+          } else if (isHalfTime) {
+            // Half-time Trap: Clap layered on Beat 3 (Step 8) + optional ghost on 15
+            if (secName === "Chorus") {
+              steps = [false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, true];
+            } else {
+              steps = [false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false];
+            }
           } else if (secName === "Chorus") {
-            // Layered with snare + ghost snap on 16
+            // Layered with snare + ghost snap on 15
             steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, true];
           } else {
             steps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
@@ -335,6 +374,9 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
             steps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
           } else if (secName === "Bridge") {
             steps = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
+          } else if (isHalfTime) {
+            // Driving 8th notes (steps 0, 2, 4, 6, 8, 10, 12, 14)
+            steps = [true, false, true, false, true, false, true, false, true, false, true, false, true, false, true, false];
           } else {
             // Full 16th-note groove
             steps = [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true];
@@ -344,7 +386,7 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
         case "hihat_triplet":
           if (secName === "Chorus") {
             // Triplets leading into beat 2, 3, 4
-            steps = [false, false, true, true, false, false, false, true, false, false, true, true, false, true, true, true];
+            steps = [false, false, false, false, false, false, true, true, false, false, false, false, false, false, true, true];
           } else if (secName === "Verse") {
             steps = [false, false, false, false, false, false, true, true, false, false, false, false, false, false, true, true];
           } else {
@@ -354,9 +396,11 @@ export function generateDynamicPatterns(report?: Partial<ReportData> | null): Re
 
         case "open_hat":
           if (secName === "Chorus") {
-            steps = [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false];
+            steps = isFourFloor
+              ? [false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false]
+              : [false, false, false, false, false, false, true, false, false, false, false, false, false, false, true, false];
           } else if (secName === "Verse") {
-            steps = [false, false, true, false, false, false, false, false, false, false, true, false, false, false, false, false];
+            steps = [false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false];
           } else {
             steps = Array(16).fill(false);
           }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { formatTime, TIER_META, tierColor, type Finding, type ReportData, type Tier } from "../lib/types";
 import { extractVideoId, useYouTubePlayer, type YouTubeBridge } from "../lib/ytPlayer";
 import { TierBadge, TierLegend, useCountUp, Reveal } from "./ui";
@@ -500,17 +500,19 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
 
       {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
           ZONE 1 â€” ANALYSIS TABS
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ————————————————————————————————————————————————————————————————————————
+          ZONE 1 — ANALYSIS TABS
+          ———————————————————————————————————————————————————————————————————————— */}
       <Reveal delay={50}>
         <div className="rounded-2xl border border-amber/25 bg-[#0b0e17] shadow-xl overflow-hidden">
           <div className="flex border-b border-white/10 bg-[#090c14] overflow-x-auto">
             {([
-              { id: "overview", label: "âš¡ OVERVIEW" },
-              { id: "harmony", label: "ðŸŽµ HARMONY" },
-              { id: "structure", label: "ðŸ—ï¸ STRUCTURE" },
-              { id: "instruments", label: "ðŸŽ¸ INSTRUMENTS" },
-              { id: "lyrics", label: "ðŸ“ LYRICS" },
-              { id: "streaming", label: "ðŸ“¡ STREAMING" },
+              { id: "overview", label: "⚡ OVERVIEW" },
+              { id: "harmony", label: "🎵 HARMONY" },
+              { id: "structure", label: "🏗️ STRUCTURE" },
+              { id: "instruments", label: "🎸 INSTRUMENTS" },
+              { id: "lyrics", label: "📝 LYRICS" },
+              { id: "streaming", label: "📡 STREAMING" },
             ] as { id: typeof analysisTab; label: string }[]).map((tab) => (
               <button key={tab.id} type="button" onClick={() => setAnalysisTab(tab.id)} className={`relative px-4 py-3.5 font-mono text-[10.5px] font-bold tracking-[0.12em] whitespace-nowrap transition cursor-pointer border-r border-white/5 last:border-r-0 ${analysisTab === tab.id ? "text-amber bg-amber/8" : "text-dim hover:text-ink hover:bg-white/5"}`}>
                 {tab.label}
@@ -654,11 +656,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
         <div className="rounded-2xl border border-cyanx/25 bg-[#0b0e17] shadow-xl overflow-hidden">
           <div className="flex border-b border-white/10 bg-[#090c14] overflow-x-auto">
             {([
-              { id: "rack", label: "ðŸŽ¹ CHANNEL RACK" },
-              { id: "mpc", label: "ðŸ¥ MPC PADS" },
-              { id: "tools", label: "ðŸŽšï¸ STUDIO TOOLS" },
-              { id: "dawmap", label: "ðŸ—ºï¸ DAW MAP" },
-              { id: "ai", label: "ðŸ¤– AI PRODUCER" },
+              { id: "rack", label: "🎹 CHANNEL RACK" },
+              { id: "mpc", label: "🥁 MPC PADS" },
+              { id: "tools", label: "🎚️ STUDIO TOOLS" },
+              { id: "dawmap", label: "🗺️ DAW MAP" },
+              { id: "ai", label: "🤖 AI PRODUCER" },
             ] as { id: typeof studioTab; label: string }[]).map((tab) => (
               <button key={tab.id} type="button" onClick={() => setStudioTab(tab.id)} className={`relative px-5 py-3.5 font-mono text-[11px] font-bold tracking-[0.12em] whitespace-nowrap transition cursor-pointer border-r border-white/5 last:border-r-0 ${studioTab === tab.id ? "text-cyanx bg-cyanx/8" : "text-dim hover:text-ink hover:bg-white/5"}`}>
                 {tab.label}

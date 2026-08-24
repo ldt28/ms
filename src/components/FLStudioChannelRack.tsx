@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ChannelPattern, InstrumentBreakdown, ReportData, Section } from "../lib/types";
-import { generateDynamicPatterns, playAuditionSound } from "../lib/patternEngine";
+import { generateDynamicPatterns, playAuditionSound, type GrooveFeel } from "../lib/patternEngine";
 import { PianoRollModal } from "./PianoRollModal";
 import { exportChannelsToMidi } from "../lib/midiExport";
 
@@ -28,12 +28,12 @@ const PATTERN_CATEGORIES = [
 type PatternCategory = (typeof PATTERN_CATEGORIES)[number]["id"];
 
 const AVAILABLE_PATTERNS = [
-  { id: "auto", label: "⚡ AUTO-SYNC", section: "" },
-  { id: "Intro", label: "PAT 01 · INTRO", section: "Intro" },
-  { id: "Verse", label: "PAT 02 · VERSE", section: "Verse" },
-  { id: "Chorus", label: "PAT 03 · CHORUS", section: "Chorus" },
-  { id: "Bridge", label: "PAT 04 · BRIDGE", section: "Bridge" },
-  { id: "Outro", label: "PAT 05 · OUTRO", section: "Outro" },
+  { id: "auto", label: "⚡ AUTO-SYNC" },
+  { id: "Intro", label: "PAT 01 · INTRO" },
+  { id: "Verse", label: "PAT 02 · VERSE" },
+  { id: "Chorus", label: "PAT 03 · CHORUS" },
+  { id: "Bridge", label: "PAT 04 · BRIDGE" },
+  { id: "Outro", label: "PAT 05 · OUTRO" },
 ];
 
 export function FLStudioChannelRack({
@@ -51,8 +51,6 @@ export function FLStudioChannelRack({
   const [selectedPatternMode, setSelectedPatternMode] = useState<string>("auto");
   const [mutedChannels, setMutedChannels] = useState<Record<string, boolean>>({});
   const [soloChannel, setSoloChannel] = useState<string | null>(null);
-  const [channelPans, setChannelPans] = useState<Record<string, number>>({});
-  const [channelVols, setChannelVols] = useState<Record<string, number>>({});
   const [activePianoRollTrack, setActivePianoRollTrack] = useState<{
     id: string;
     name: string;
@@ -61,8 +59,11 @@ export function FLStudioChannelRack({
   const [copiedStatus, setCopiedStatus] = useState(false);
   const [customBpm, setCustomBpm] = useState<number | null>(null);
   const detectedBpm = bpm && bpm > 40 && bpm < 260 ? bpm : 120;
-  // If detected BPM is half-time trap (60-95 BPM), default to 2x double-time for snappy 16th grid rhythm
-  const [bpmMultiplier, setBpmMultiplier] = useState<number>(detectedBpm < 95 ? 2 : 1);
+
+  // Groove feel selection (Defaults to Half-Time Trap for Hip-Hop/120+ BPM)
+  const [grooveFeel, setGrooveFeel] = useState<GrooveFeel>(() => (detectedBpm >= 110 ? "half_time_trap" : "standard_pop"));
+  const [bpmMultiplier, setBpmMultiplier] = useState<number>(1);
+  const [downbeatOffsetSec, setDownbeatOffsetSec] = useState<number>(0);
   const [phaseNudgeMs, setPhaseNudgeMs] = useState(0);
   const [soundAudioEnabled, setSoundAudioEnabled] = useState(false);
   const [localPlaying, setLocalPlaying] = useState(false);
@@ -101,13 +102,13 @@ export function FLStudioChannelRack({
     return () => cancelAnimationFrame(animId);
   }, [isMasterPlaying, isPlaying, currentTime]);
 
-  // Generate dynamic patterns bank from audio DSP features
+  // Generate dynamic patterns bank from audio DSP features & Groove feel
   const basePatterns = useMemo(() => {
-    if (instruments?.sectionPatterns) {
-      return instruments.sectionPatterns;
-    }
-    return generateDynamicPatterns(report || { tempo: { value: bpm, tier: "computed", source: "tempo" } });
-  }, [instruments, report, bpm]);
+    return generateDynamicPatterns(
+      report || { tempo: { value: bpm, tier: "computed", source: "tempo" } },
+      grooveFeel
+    );
+  }, [report, bpm, grooveFeel]);
 
   // Local editable step patterns so the user can tweak and program steps in real time
   const [patternBank, setPatternBank] = useState<Record<string, ChannelPattern[]>>(basePatterns);
@@ -134,13 +135,25 @@ export function FLStudioChannelRack({
   const effectiveBpm = activeBaseBpm * bpmMultiplier;
   const barDuration = (60 / effectiveBpm) * 4;
 
-  // Real-time active step calculation with phase nudge
-  const nudgedTime = Math.max(0, smoothTime + phaseNudgeMs / 1000);
+  // Phase-locked time calculation with downbeat anchor & micro-nudge
+  const adjustedTime = Math.max(0, smoothTime - downbeatOffsetSec + phaseNudgeMs / 1000);
+  const currentBarNum = barDuration > 0 ? Math.floor(adjustedTime / barDuration) + 1 : 1;
+  const totalDuration = report?.meta?.durationSec || 180;
+  const totalBars = barDuration > 0 ? Math.max(1, Math.ceil(totalDuration / barDuration)) : 64;
+  const currentBeatInBar = barDuration > 0 ? Math.floor(((adjustedTime % barDuration) / barDuration) * 4) + 1 : 1;
+  const barProgressPct = barDuration > 0 ? ((adjustedTime % barDuration) / barDuration) * 100 : 0;
+
   const activeStep = isPlaying && barDuration > 0
-    ? Math.floor(((nudgedTime % barDuration) / barDuration) * 16)
+    ? Math.floor(((adjustedTime % barDuration) / barDuration) * 16)
     : localPlaying
     ? localStep
     : 0;
+
+  // 1-Click Tap Sync: Locks Beat 1 downbeat to current playback moment
+  const handleTapDownbeatSync = () => {
+    setDownbeatOffsetSec(smoothTime);
+    setPhaseNudgeMs(0);
+  };
 
   // Standalone loop timer if local playing is active
   useEffect(() => {
@@ -194,11 +207,11 @@ export function FLStudioChannelRack({
     setPatternBank((prev) => {
       const sectionChans = prev[effectiveSectionKey] || [];
       const updated = sectionChans.map((ch) => {
-        if (ch.id === "kick_punch") {
+        if (ch.id === "kick_drum") {
           const newSteps = [true, false, false, false, true, false, false, false, true, false, false, false, true, false, false, false];
           return { ...ch, steps: newSteps };
         }
-        if (ch.id === "snare_acoustic" || ch.id === "clap_snap") {
+        if (ch.id === "snare_acoustic" || ch.id === "clap_stereo") {
           const newSteps = [false, false, false, false, true, false, false, false, false, false, false, false, true, false, false, false];
           return { ...ch, steps: newSteps };
         }
@@ -212,7 +225,7 @@ export function FLStudioChannelRack({
     setPatternBank((prev) => {
       const sectionChans = prev[effectiveSectionKey] || [];
       const updated = sectionChans.map((ch) => {
-        if (ch.id === "hat_closed" || ch.id === "hat_triplet_rolls") {
+        if (ch.id === "hihat_closed" || ch.id === "hihat_triplet") {
           const newSteps = [...Array(16)].map((_, i) => (i % 2 === 0 ? true : Math.random() > 0.4));
           return { ...ch, steps: newSteps };
         }
@@ -280,6 +293,7 @@ export function FLStudioChannelRack({
 
   return (
     <div className="hud-panel rounded-xl border border-cyanx/20 bg-[#0d1017] shadow-2xl overflow-hidden font-mono text-xs select-none relative">
+      {/* ── Top Header Controls & Live Phase-Lock System ── */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-white/10 bg-[#121622] px-4 py-3">
         <div className="flex flex-wrap items-center gap-2.5">
           <button
@@ -299,16 +313,17 @@ export function FLStudioChannelRack({
           <div className="flex items-center gap-2">
             <span className={`h-3 w-3 rounded-full ${isMasterPlaying ? "bg-mint animate-ping" : "bg-cyanx"}`} />
             <span className="font-display text-xs font-black tracking-widest text-ink">
-              STEP.SEQUENCER // RACK MATRIX
+              STEP.SEQUENCER // HUMAN BREAKDOWN MATRIX
             </span>
           </div>
 
+          {/* Live BPM & Multiplier */}
           <div className="flex items-center gap-1.5 rounded-lg bg-pit border border-cyanx/40 px-2.5 py-1 text-[10.5px] font-extrabold text-cyanx shadow-inner">
             <span className="text-amber">{effectiveBpm.toFixed(1)} BPM</span>
             <div className="flex items-center gap-1 ml-1 border-l border-white/20 pl-1.5 text-[9.5px]">
               {[
-                { mult: 2, label: "⚡ 2X (FAST)" },
-                { mult: 1, label: "1X" },
+                { mult: 1, label: "1X (NATURAL)" },
+                { mult: 2, label: "2X" },
                 { mult: 0.5, label: "0.5X" },
               ].map(({ mult, label }) => (
                 <button
@@ -327,73 +342,124 @@ export function FLStudioChannelRack({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 rounded-lg bg-pit border border-white/10 px-2 py-1 text-[9.5px] text-faint">
-            <span className="font-bold text-dim">ALIGN:</span>
+          {/* 1-Click Downbeat Lock & Phase Alignment */}
+          <div className="flex items-center gap-1 rounded-lg bg-pit border border-mint/40 px-2 py-1 text-[9.5px]">
             <button
               type="button"
-              onClick={() => setPhaseNudgeMs((p) => p - 25)}
-              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
+              onClick={handleTapDownbeatSync}
+              className="flex items-center gap-1 rounded bg-mint/20 hover:bg-mint hover:text-black text-mint px-2 py-0.5 font-black transition cursor-pointer border border-mint/40 shadow-xs"
+              title="Snap Beat 1 (Downbeat) right to this exact second in the song"
             >
-              -25ms
+              <span>⚡</span> LOCK BEAT 1 (TAP SYNC)
             </button>
-            <span className="font-mono text-cyanx font-bold min-w-8 text-center">{phaseNudgeMs > 0 ? `+${phaseNudgeMs}` : phaseNudgeMs}ms</span>
-            <button
-              type="button"
-              onClick={() => setPhaseNudgeMs((p) => p + 25)}
-              className="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
-            >
-              +25ms
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1 overflow-x-auto">
-            {AVAILABLE_PATTERNS.map((p) => (
+            <div className="flex items-center gap-0.5 ml-1 border-l border-white/10 pl-1 text-faint">
               <button
-                key={p.id}
                 type="button"
-                onClick={() => handleSelectPattern(p.id)}
-                className={`rounded px-2.5 py-1 text-[10px] font-extrabold transition cursor-pointer shrink-0 ${
-                  selectedPatternMode === p.id
-                    ? "bg-amber text-black shadow-md font-black scale-105"
-                    : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-amber/50"
-                }`}
+                onClick={() => setPhaseNudgeMs((p) => p - 10)}
+                className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
+                title="Nudge earlier by 10ms"
               >
-                {p.label}
+                -10ms
               </button>
-            ))}
+              <span className="font-mono text-cyanx font-bold min-w-7 text-center">
+                {phaseNudgeMs > 0 ? `+${phaseNudgeMs}` : phaseNudgeMs}ms
+              </span>
+              <button
+                type="button"
+                onClick={() => setPhaseNudgeMs((p) => p + 10)}
+                className="px-1 py-0.5 rounded bg-white/5 hover:bg-white/15 text-ink cursor-pointer"
+                title="Nudge later by 10ms"
+              >
+                +10ms
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-0.5">
-          <button
-            type="button"
-            onClick={() => setSoundAudioEnabled(!soundAudioEnabled)}
-            className={`rounded-md px-2.5 py-1 text-[10px] font-extrabold transition shrink-0 cursor-pointer border ${
-              soundAudioEnabled
-                ? "border-mint bg-mint/20 text-mint animate-pulse"
-                : "border-white/10 bg-pit/60 text-faint hover:text-dim"
-            }`}
-          >
-            {soundAudioEnabled ? "🔊 SYNTH SOUNDS: ON" : "🔇 SYNTH SOUNDS: OFF"}
-          </button>
-
-          {PATTERN_CATEGORIES.map((cat) => (
+        {/* Groove Feel Selector */}
+        <div className="flex items-center gap-1 rounded-lg bg-pit border border-amber/40 p-1 text-[9.5px]">
+          <span className="text-dim font-bold px-1 hidden xl:inline">GROOVE:</span>
+          {[
+            { id: "half_time_trap", label: "🥁 HALF-TIME TRAP (Beat 3 Snare)" },
+            { id: "standard_pop", label: "⚡ STANDARD 4/4 (Beats 2 & 4)" },
+            { id: "four_floor", label: "💥 4-ON-FLOOR" },
+          ].map((g) => (
             <button
-              key={cat.id}
+              key={g.id}
               type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition shrink-0 cursor-pointer ${
-                selectedCategory === cat.id
-                  ? "bg-cyanx text-black shadow-md shadow-cyanx/40 font-black"
-                  : "bg-pit/80 border border-white/10 text-dim hover:text-ink hover:border-cyanx/40"
+              onClick={() => setGrooveFeel(g.id as GrooveFeel)}
+              className={`rounded px-2 py-1 font-extrabold transition cursor-pointer ${
+                grooveFeel === g.id
+                  ? "bg-amber text-black shadow-xs font-black"
+                  : "text-faint hover:text-ink hover:bg-white/5"
               }`}
             >
-              {cat.label}
+              {g.label}
             </button>
           ))}
         </div>
       </div>
 
+      {/* ── Real-Time Measure & Section Progression HUD ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 bg-[#090d16] border-b border-white/10 text-[10px]">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 font-mono">
+            <span className="text-cyanx font-black text-xs">BAR {currentBarNum}</span>
+            <span className="text-faint">/ {totalBars}</span>
+          </div>
+
+          <div className="flex items-center gap-1 rounded bg-pit px-2 py-0.5 border border-white/10">
+            <span className="text-dim font-bold">BEAT:</span>
+            {[1, 2, 3, 4].map((b) => (
+              <span
+                key={b}
+                className={`h-2 w-2 rounded-full transition-all duration-75 ${
+                  currentBeatInBar === b && isMasterPlaying
+                    ? b === 1
+                      ? "bg-amber shadow-[0_0_8px_#ffd54f] scale-125"
+                      : b === 3 && grooveFeel === "half_time_trap"
+                      ? "bg-mint shadow-[0_0_8px_#00ff9d] scale-125"
+                      : "bg-cyanx shadow-[0_0_6px_#00f0ff] scale-110"
+                    : "bg-pit/70 border border-white/10"
+                }`}
+              />
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1 text-[9.5px]">
+            <span className="text-dim font-bold">STEP:</span>
+            <span className="font-mono text-cyanx font-bold">{String(activeStep + 1).padStart(2, "0")}/16</span>
+          </div>
+
+          {/* Mini Bar Progress Meter */}
+          <div className="hidden sm:flex items-center gap-1 w-24 h-2 bg-pit rounded-full overflow-hidden border border-white/10">
+            <div
+              className="h-full bg-gradient-to-r from-cyanx via-mint to-amber transition-all duration-75"
+              style={{ width: `${barProgressPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Section Pattern Switcher */}
+        <div className="flex items-center gap-1 overflow-x-auto">
+          {AVAILABLE_PATTERNS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => handleSelectPattern(p.id)}
+              className={`rounded px-2.5 py-1 text-[9.5px] font-extrabold transition cursor-pointer shrink-0 ${
+                selectedPatternMode === p.id
+                  ? "bg-amber text-black shadow-md font-black scale-105"
+                  : "bg-pit/70 border border-white/10 text-dim hover:text-ink hover:border-amber/50"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Toolbar & Filter Categories ── */}
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-1.5 bg-[#0a0d16] border-b border-white/5 text-[9.5px]">
         <div className="flex items-center gap-2 text-faint">
           <span className="font-bold text-cyanx">QUICK PATTERN TOOLS:</span>
@@ -423,6 +489,18 @@ export function FLStudioChannelRack({
         <div className="flex items-center gap-2">
           <button
             type="button"
+            onClick={() => setSoundAudioEnabled(!soundAudioEnabled)}
+            className={`rounded-md px-2 py-0.5 text-[9.5px] font-extrabold transition shrink-0 cursor-pointer border ${
+              soundAudioEnabled
+                ? "border-mint bg-mint/20 text-mint animate-pulse"
+                : "border-white/10 bg-pit/60 text-faint hover:text-dim"
+            }`}
+          >
+            {soundAudioEnabled ? "🔊 SYNTH SOUNDS: ON" : "🔇 SYNTH SOUNDS: OFF"}
+          </button>
+
+          <button
+            type="button"
             onClick={downloadMidiFile}
             className="px-2.5 py-0.5 rounded bg-amber/20 hover:bg-amber/30 text-amber border border-amber/40 font-bold transition cursor-pointer flex items-center gap-1 shadow-xs"
             title="Download standard MIDI file (.mid) to drag & drop into FL Studio, Ableton, or Logic Pro"
@@ -437,6 +515,24 @@ export function FLStudioChannelRack({
             {copiedStatus ? "✓ COPIED JSON" : "📋 COPY JSON"}
           </button>
         </div>
+      </div>
+
+      {/* Category Pills */}
+      <div className="flex items-center gap-1 px-4 py-1.5 bg-[#090b12] border-b border-white/5 overflow-x-auto">
+        {PATTERN_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => setSelectedCategory(cat.id)}
+            className={`rounded-md px-2.5 py-1 text-[10px] font-bold transition shrink-0 cursor-pointer ${
+              selectedCategory === cat.id
+                ? "bg-cyanx text-black shadow-md shadow-cyanx/40 font-black"
+                : "bg-pit/80 border border-white/10 text-dim hover:text-ink hover:border-cyanx/40"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
       {/* Contained Horizontal Scroll Container for Stem Tracks & 16-Step Grid */}
