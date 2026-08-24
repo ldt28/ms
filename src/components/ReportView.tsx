@@ -19,6 +19,7 @@ import { AnimatedSocialExportModal } from "./AnimatedSocialExportModal";
 import { AIProducerBlueprint } from "./AIProducerBlueprint";
 import { LiveMPCPadSampler } from "./LiveMPCPadSampler";
 import { AudioSpectrumHUD } from "./AudioSpectrumHUD";
+import { StudioParametricEQ } from "./StudioParametricEQ";
 import { analyzeHarmonics } from "../lib/harmonicEngine";
 
 function PanelHeader({ kicker, title, right }: { kicker: string; title: string; right?: ReactNode }) {
@@ -722,6 +723,11 @@ export function ReportView({ report, audio }: { report: ReportData; audio: HTMLA
           currentTime={currentPlaybackTime}
           texture={report.texture}
         />
+      </Reveal>
+
+      {/* Interactive 4-Band Mastering Parametric EQ & Tone Sculptor */}
+      <Reveal delay={80}>
+        <StudioParametricEQ />
       </Reveal>
 
       {/* texture */}
